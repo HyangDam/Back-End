@@ -1,4 +1,6 @@
 from pathlib import Path
+from collections import Counter
+import re
 
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -6,6 +8,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_PATH = BASE_DIR / "data" / "perfumes.csv"
+MAX_AUTO_KEYWORDS_PER_CATEGORY = 80
 
 
 CATEGORY_KEYWORDS = {
@@ -21,6 +24,51 @@ CATEGORY_KEYWORDS = {
     "woody": ["sandalwood", "cedar", "vetiver"],
 }
 
+AUTO_CATEGORY_SEEDS = {
+    "date": [
+        "rose", "jasmine", "vanilla", "musk", "sweet", "floral", "peony",
+        "gardenia", "tuberose", "amber",
+    ],
+    "school_work": [
+        "clean", "fresh", "musk", "tea", "citrus", "bergamot", "lemon",
+        "green", "soap", "aldehyde", "cotton",
+    ],
+    "summer": [
+        "citrus", "bergamot", "lemon", "orange", "grapefruit", "lime",
+        "mandarin", "yuzu", "aquatic", "marine", "water", "green", "mint",
+    ],
+    "winter": [
+        "amber", "vanilla", "benzoin", "tonka", "cinnamon", "incense",
+        "sandalwood", "cedar", "oud", "labdanum", "resin",
+    ],
+    "clean": [
+        "clean", "musk", "white musk", "soap", "powder", "aldehyde",
+        "iris", "violet", "cotton", "linen", "tea",
+    ],
+    "sweet": [
+        "sweet", "vanilla", "tonka", "caramel", "honey", "almond",
+        "praline", "chocolate", "cacao", "coconut", "sugar", "coffee",
+        "gourmand",
+    ],
+    "elegant": [
+        "rose", "jasmine", "iris", "violet", "osmanthus", "magnolia",
+        "sandalwood", "musk", "amber", "floral", "powder",
+    ],
+    "floral": [
+        "rose", "jasmine", "tuberose", "violet", "iris", "geranium",
+        "orange blossom", "neroli", "ylang", "magnolia", "gardenia",
+        "peony", "lily", "osmanthus", "flower", "floral",
+    ],
+    "citrus": [
+        "bergamot", "lemon", "grapefruit", "orange", "mandarin", "lime",
+        "yuzu", "tangerine", "citron", "petitgrain", "citrus",
+    ],
+    "woody": [
+        "sandalwood", "cedar", "cedarwood", "vetiver", "oud", "agarwood",
+        "guaiac", "oakmoss", "patchouli", "wood", "woody",
+    ],
+}
+
 AVOID_KEYWORDS = {
     "powdery": ["powdery", "powder"],
     "musk": ["musk", "musky"],
@@ -28,6 +76,62 @@ AVOID_KEYWORDS = {
     "spicy": ["spicy", "pepper", "cinnamon", "clove"],
     "sweet": ["sweet", "vanilla", "caramel", "gourmand"],
 }
+
+
+def normalize_note(note):
+    normalized = str(note).strip().lower()
+
+    for marker in [
+        "click here for ingredients",
+        "please be aware",
+        "ingredients",
+        "×close",
+    ]:
+        if marker in normalized:
+            normalized = normalized.split(marker)[0]
+
+    normalized = " ".join(normalized.split())
+    return normalized.strip(" .:-")
+
+
+def note_matches_seed(note, seed):
+    if " " in seed:
+        return seed in note
+
+    pattern = rf"\b{re.escape(seed)}\b"
+    return re.search(pattern, note) is not None
+
+
+def extract_note_counts(notes_series):
+    notes = []
+
+    for value in notes_series.fillna("").astype(str):
+        for part in value.replace(";", ",").split(","):
+            note = normalize_note(part)
+            if note:
+                notes.append(note)
+
+    return Counter(notes)
+
+
+def build_auto_category_keywords(df):
+    note_counts = extract_note_counts(df["Notes"])
+    auto_keywords = {}
+
+    for category, base_keywords in CATEGORY_KEYWORDS.items():
+        seeds = AUTO_CATEGORY_SEEDS.get(category, [])
+        matched_notes = []
+
+        for note, _ in note_counts.most_common():
+            if any(note_matches_seed(note, seed) for seed in seeds):
+                matched_notes.append(note)
+
+        merged_keywords = list(
+            dict.fromkeys(base_keywords + matched_notes[:MAX_AUTO_KEYWORDS_PER_CATEGORY])
+        )
+        auto_keywords[category] = merged_keywords
+
+    return auto_keywords
 
 
 def load_perfume_data():
@@ -49,11 +153,14 @@ def load_perfume_data():
     return df
 
 
-def build_user_query(selected_categories):
+def build_user_query(selected_categories, category_keywords=None):
+    if category_keywords is None:
+        category_keywords = CATEGORY_KEYWORDS
+
     keywords = []
 
     for category in selected_categories:
-        keywords.extend(CATEGORY_KEYWORDS.get(category, []))
+        keywords.extend(category_keywords.get(category, []))
 
     return " ".join(keywords)
 
@@ -61,6 +168,7 @@ def build_user_query(selected_categories):
 class PerfumeRecommender:
     def __init__(self):
         self.df = load_perfume_data()
+        self.category_keywords = build_auto_category_keywords(self.df)
 
         self.notes_vectorizer = TfidfVectorizer()
         self.desc_vectorizer = TfidfVectorizer()
@@ -70,11 +178,20 @@ class PerfumeRecommender:
         self.desc_matrix = self.desc_vectorizer.fit_transform(self.df["desc_text"])
         self.brand_matrix = self.brand_vectorizer.fit_transform(self.df["brand_text"])
 
-    def recommend(self, selected_categories, avoid_categories=None, top_n=5):
+    def recommend(
+        self,
+        selected_categories,
+        avoid_categories=None,
+        focus_categories=None,
+        top_n=5,
+    ):
         if avoid_categories is None:
             avoid_categories = []
 
-        query = build_user_query(selected_categories)
+        if focus_categories is None:
+            focus_categories = []
+
+        query = build_user_query(selected_categories, self.category_keywords)
 
         query_notes_vec = self.notes_vectorizer.transform([query])
         query_desc_vec = self.desc_vectorizer.transform([query])
@@ -84,11 +201,24 @@ class PerfumeRecommender:
         desc_sim = cosine_similarity(query_desc_vec, self.desc_matrix).flatten()
         brand_sim = cosine_similarity(query_brand_vec, self.brand_matrix).flatten()
 
-        final_score = (
+        base_score = (
             0.70 * notes_sim +
             0.25 * desc_sim +
             0.05 * brand_sim
         )
+
+        final_score = base_score
+
+        if focus_categories:
+            focus_query = build_user_query(focus_categories, self.category_keywords)
+            focus_notes_vec = self.notes_vectorizer.transform([focus_query])
+            focus_desc_vec = self.desc_vectorizer.transform([focus_query])
+
+            focus_notes_sim = cosine_similarity(focus_notes_vec, self.notes_matrix).flatten()
+            focus_desc_sim = cosine_similarity(focus_desc_vec, self.desc_matrix).flatten()
+            focus_score = (0.80 * focus_notes_sim) + (0.20 * focus_desc_sim)
+
+            final_score = (0.70 * base_score) + (0.30 * focus_score)
 
         avoid_terms = []
         for category in avoid_categories:
@@ -119,10 +249,17 @@ if __name__ == "__main__":
     selected = ["date", "sweet", "floral"]
     avoid = ["woody"]
 
-    results = recommender.recommend(selected, avoid_categories=avoid, top_n=5)
+    focus = ["floral"]
+    results = recommender.recommend(
+        selected,
+        avoid_categories=avoid,
+        focus_categories=focus,
+        top_n=5,
+    )
 
     print(f"Selected categories: {', '.join(selected)}")
     print(f"Avoid categories: {', '.join(avoid)}")
+    print(f"Focus categories: {', '.join(focus)}")
 
     for _, row in results.iterrows():
         print("=" * 60)
