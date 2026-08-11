@@ -22,6 +22,15 @@ CATEGORY_KEYWORDS = {
     "floral": ["rose", "jasmine", "peony", "tuberose"],
     "citrus": ["bergamot", "lemon", "orange", "grapefruit"],
     "woody": ["sandalwood", "cedar", "vetiver"],
+    "musk": ["musk", "musky", "white musk"],
+    "oriental": ["amber", "vanilla", "incense", "resin", "labdanum", "spice"],
+    "aquatic": ["aquatic", "marine", "water", "sea", "ocean"],
+    "green": ["green", "leaf", "leaves", "grass", "herbal", "mint"],
+    "spicy": ["spicy", "pepper", "cinnamon", "clove", "cardamom"],
+    "powdery": ["powdery", "powder", "iris", "violet"],
+    "gourmand": ["gourmand", "vanilla", "caramel", "chocolate", "honey", "almond"],
+    "fresh": ["fresh", "clean", "citrus", "bergamot", "green", "light"],
+    "earthy": ["earthy", "patchouli", "oakmoss", "moss", "soil", "vetiver"]
 }
 
 AUTO_CATEGORY_SEEDS = {
@@ -70,11 +79,17 @@ AUTO_CATEGORY_SEEDS = {
 }
 
 AVOID_KEYWORDS = {
-    "powdery": ["powdery", "powder"],
-    "musk": ["musk", "musky"],
+    "powdery": ["powdery", "powder", "iris", "violet"],
+    "musk": ["musk", "musky", "white musk"],
     "woody": ["woody", "wood", "sandalwood", "cedar", "vetiver", "oud"],
     "spicy": ["spicy", "pepper", "cinnamon", "clove"],
     "sweet": ["sweet", "vanilla", "caramel", "gourmand"],
+    "oriental": ["amber", "incense", "resin", "labdanum", "oriental"],
+    "aquatic": ["aquatic", "marine", "water", "sea", "ocean"],
+    "green": ["green", "leaf", "leaves", "grass", "herbal", "mint"],
+    "gourmand": ["gourmand", "vanilla", "caramel", "chocolate", "honey", "almond"],
+    "fresh": ["fresh", "clean", "citrus", "bergamot", "green", "light"],
+    "earthy": ["earthy", "patchouli", "oakmoss", "moss", "soil", "vetiver"],
 }
 
 
