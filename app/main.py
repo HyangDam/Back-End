@@ -12,6 +12,8 @@ from app.routers import users
 from app.services.preference_extractor import extract_preferences_from_text
 from app.services.recommender import AVOID_KEYWORDS, CATEGORY_KEYWORDS, PerfumeRecommender
 from app.routers import perfumes
+from app.models import auth
+from app.routers import auth as auth_router
 
 
 app = FastAPI(
@@ -25,6 +27,7 @@ Base.metadata.create_all(bind=engine)
 app.include_router(users.router)
 app.include_router(onboarding_router.router)
 app.include_router(perfumes.router)
+app.include_router(auth_router.router)
 
 app.add_middleware(
     CORSMiddleware,
