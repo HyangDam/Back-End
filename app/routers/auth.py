@@ -86,7 +86,6 @@ def social_login(
         db.commit()
 
     access_token, refresh_token = issue_tokens(user.user_id, db)
-
     profile_required = not bool(user.name and user.nickname)
 
     return {

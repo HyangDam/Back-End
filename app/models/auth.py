@@ -22,7 +22,10 @@ class SocialAccount(Base):
         ForeignKey("users.user_id"),
         nullable=False,
     )
-    provider: Mapped[SocialProvider] = mapped_column(SqlEnum(SocialProvider), nullable=False)
+    provider: Mapped[SocialProvider] = mapped_column(
+        SqlEnum(SocialProvider),
+        nullable=False,
+    )
     provider_user_id: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

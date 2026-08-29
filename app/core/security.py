@@ -5,11 +5,14 @@ from datetime import datetime, timedelta
 
 import jwt
 from fastapi import Depends, HTTPException
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/social-login")
+bearer_scheme = HTTPBearer()
 
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "hyangdam-local-dev-secret-key-for-jwt-dev")
+JWT_SECRET_KEY = os.getenv(
+    "JWT_SECRET_KEY",
+    "hyangdam-local-dev-secret-key-for-jwt-dev",
+)
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("JWT_REFRESH_TOKEN_EXPIRE_DAYS", "14"))
@@ -51,8 +54,10 @@ def decode_access_token(token: str) -> dict:
     return payload
 
 
-def get_current_user_id(token: str = Depends(oauth2_scheme)) -> int:
-    payload = decode_access_token(token)
+def get_current_user_id(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+) -> int:
+    payload = decode_access_token(credentials.credentials)
     user_id = payload.get("sub")
 
     if user_id is None:
