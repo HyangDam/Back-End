@@ -31,7 +31,6 @@ app.include_router(perfumes.router)
 app.include_router(perfume_interactions.router)
 app.include_router(auth_router.router)
 
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
