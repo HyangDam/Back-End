@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.core.security import get_current_user_id
 from app.database import get_db
 from app.models.onboarding import UserOnboarding
-from app.routers.users import get_current_user_id
 from app.schemas.onboarding import (
     OnboardingPreferenceRequest,
     OnboardingPreferenceResponse,
@@ -18,9 +18,10 @@ router = APIRouter(
 @router.post("/preferences", response_model=OnboardingPreferenceResponse)
 def save_onboarding_preferences(
     request: OnboardingPreferenceRequest,
+    current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
-    user_id = get_current_user_id()
+    user_id = current_user_id
 
     existing_onboarding = db.query(UserOnboarding).filter(
         UserOnboarding.user_id == user_id
@@ -52,8 +53,11 @@ def save_onboarding_preferences(
 
 
 @router.get("/me", response_model=OnboardingPreferenceResponse)
-def get_my_onboarding_preferences(db: Session = Depends(get_db)):
-    user_id = get_current_user_id()
+def get_my_onboarding_preferences(
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    user_id = current_user_id
 
     onboarding = db.query(UserOnboarding).filter(
         UserOnboarding.user_id == user_id
@@ -68,9 +72,10 @@ def get_my_onboarding_preferences(db: Session = Depends(get_db)):
 @router.patch("/preferences", response_model=OnboardingPreferenceResponse)
 def update_onboarding_preferences(
     request: OnboardingPreferenceRequest,
+    current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
-    user_id = get_current_user_id()
+    user_id = current_user_id
 
     onboarding = db.query(UserOnboarding).filter(
         UserOnboarding.user_id == user_id

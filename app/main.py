@@ -5,14 +5,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from app.database import Base, engine
+from app.models import auth
 from app.models import onboarding
 from app.models import user
+from app.routers import auth as auth_router
 from app.routers import onboarding as onboarding_router
 from app.routers import users
 from app.services.preference_extractor import extract_preferences_from_text
 from app.services.recommender import AVOID_KEYWORDS, CATEGORY_KEYWORDS, PerfumeRecommender
 from app.routers import perfumes
-
+from app.models import perfume_interaction
+from app.routers import perfume_interactions
 
 app = FastAPI(
     title="HyangDam API",
@@ -25,6 +28,9 @@ Base.metadata.create_all(bind=engine)
 app.include_router(users.router)
 app.include_router(onboarding_router.router)
 app.include_router(perfumes.router)
+app.include_router(perfume_interactions.router)
+app.include_router(auth_router.router)
+
 
 app.add_middleware(
     CORSMiddleware,
