@@ -3,6 +3,7 @@ from datetime import date, datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.core.security import get_current_user_id
 from app.database import get_db
 from app.models.user import User, UserStatus
 from app.schemas.user import UserProfileCreate, UserProfileUpdate, UserResponse
@@ -21,10 +22,6 @@ def calculate_age(birth_date: date) -> int:
         age -= 1
 
     return age
-
-
-def get_current_user_id() -> int:
-    return 1
 
 
 @router.post("/me/profile", response_model=UserResponse)
@@ -55,9 +52,12 @@ def create_user_profile(
 
 
 @router.get("/me", response_model=UserResponse)
-def get_my_profile(db: Session = Depends(get_db)):
+def get_my_profile(
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
     user = db.query(User).filter(
-        User.user_id == get_current_user_id(),
+        User.user_id == current_user_id,
         User.status == UserStatus.active,
     ).first()
 
@@ -70,10 +70,11 @@ def get_my_profile(db: Session = Depends(get_db)):
 @router.patch("/me", response_model=UserResponse)
 def update_my_profile(
     request: UserProfileUpdate,
+    current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
     user = db.query(User).filter(
-        User.user_id == get_current_user_id(),
+        User.user_id == current_user_id,
         User.status == UserStatus.active,
     ).first()
 
@@ -95,9 +96,12 @@ def update_my_profile(
 
 
 @router.delete("/me")
-def delete_my_account(db: Session = Depends(get_db)):
+def delete_my_account(
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
     user = db.query(User).filter(
-        User.user_id == get_current_user_id(),
+        User.user_id == current_user_id,
         User.status == UserStatus.active,
     ).first()
 
