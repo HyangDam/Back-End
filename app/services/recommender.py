@@ -161,6 +161,8 @@ def load_perfume_data():
     for column in required_columns:
         df[column] = df[column].fillna("")
 
+    # Keep recommendation results aligned with perfumes.perfume_id in the DB.
+    df["perfume_id"] = df.index + 1
     df["notes_text"] = df["Notes"].str.lower()
     df["desc_text"] = df["Description"].str.lower()
     df["brand_text"] = df["Brand"].str.lower()
@@ -251,7 +253,7 @@ class PerfumeRecommender:
         top_indices = final_score.argsort()[::-1][:top_n]
 
         results = self.df.iloc[top_indices][
-            ["Name", "Brand", "Description", "Notes", "Image URL"]
+            ["perfume_id", "Name", "Brand", "Description", "Notes", "Image URL"]
         ].copy()
 
         results["score"] = final_score[top_indices]

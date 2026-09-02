@@ -110,6 +110,7 @@ def perfume_results_to_response(results):
     return [
         {
             "rank": rank,
+            "perfume_id": int(row["perfume_id"]),
             "name": row["Name"],
             "brand": row["Brand"],
             "score": round(float(row["score"]), 4),
