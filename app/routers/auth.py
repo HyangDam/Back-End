@@ -3,9 +3,11 @@ import json
 import os
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+from urllib.request import Request as UrlRequest, urlopen
 
-from fastapi import APIRouter, Depends, HTTPException
+import jwt
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
 
 from app.core.security import (
@@ -31,12 +33,16 @@ router = APIRouter(
 
 KAKAO_TOKEN_URL = "https://kauth.kakao.com/oauth/token"
 KAKAO_USER_INFO_URL = "https://kapi.kakao.com/v2/user/me"
-GOOGLE_USER_INFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
-KAKAO_REST_API_KEY = os.getenv(
-    "KAKAO_REST_API_KEY",
-    "404563302b790bd01fff700150811b32",
+KAKAO_JWKS_URL = "https://kauth.kakao.com/.well-known/jwks.json"
+KAKAO_EVENT_ISSUER = "https://kauth.kakao.com"
+KAKAO_USER_UNLINKED_EVENT = (
+    "https://schemas.openid.net/secevent/oauth/event-type/user-unlinked"
 )
+GOOGLE_USER_INFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
+KAKAO_REST_API_KEY = os.getenv("KAKAO_REST_API_KEY")
 KAKAO_CLIENT_SECRET = os.getenv("KAKAO_CLIENT_SECRET")
+ALLOW_DEV_SOCIAL_LOGIN = os.getenv("ALLOW_DEV_SOCIAL_LOGIN", "false").lower() == "true"
+kakao_jwk_client = jwt.PyJWKClient(KAKAO_JWKS_URL, cache_keys=True)
 
 
 def request_json(
@@ -50,7 +56,7 @@ def request_json(
     if form_data is not None:
         data = urlencode(form_data).encode("utf-8")
 
-    request = Request(
+    request = UrlRequest(
         url,
         data=data,
         headers=headers or {},
@@ -74,6 +80,8 @@ def request_json(
 
 
 def get_kakao_profile(code: str, redirect_uri: str) -> dict:
+    if not KAKAO_REST_API_KEY:
+        raise HTTPException(status_code=500, detail="Kakao REST API key is not configured.")
     form_data = {
         "grant_type": "authorization_code",
         "client_id": KAKAO_REST_API_KEY,
@@ -105,12 +113,6 @@ def get_kakao_profile(code: str, redirect_uri: str) -> dict:
     profile = kakao_account.get("profile") or {}
     email = kakao_account.get("email")
 
-    if not email:
-        raise HTTPException(
-            status_code=400,
-            detail="Kakao account email was not provided. Check Kakao consent settings.",
-        )
-
     return {
         "provider": "kakao",
         "provider_user_id": str(user_response["id"]),
@@ -129,12 +131,6 @@ def get_google_profile(provider_token: str) -> dict:
     )
     email = user_response.get("email")
 
-    if not email:
-        raise HTTPException(
-            status_code=400,
-            detail="Google account email was not provided.",
-        )
-
     return {
         "provider": "google",
         "provider_user_id": user_response["sub"],
@@ -146,16 +142,21 @@ def get_google_profile(provider_token: str) -> dict:
 
 
 def get_dev_profile(request: SocialLoginRequest) -> dict:
-    if not request.provider_user_id or not request.email:
+    if not ALLOW_DEV_SOCIAL_LOGIN:
         raise HTTPException(
             status_code=400,
-            detail="provider_user_id and email are required for dev social login.",
+            detail="Use a Kakao authorization code or Google provider token.",
+        )
+    if not request.provider_user_id:
+        raise HTTPException(
+            status_code=400,
+            detail="provider_user_id is required for dev social login.",
         )
 
     return {
         "provider": request.provider,
         "provider_user_id": request.provider_user_id,
-        "email": str(request.email),
+        "email": str(request.email) if request.email else None,
         "name": request.name,
         "nickname": request.nickname,
         "profile_image_url": None,
@@ -166,6 +167,11 @@ def resolve_social_profile(request: SocialLoginRequest) -> dict:
     if request.provider == "kakao":
         if request.code and request.redirect_uri:
             return get_kakao_profile(request.code, request.redirect_uri)
+        if request.code or request.redirect_uri:
+            raise HTTPException(
+                status_code=400,
+                detail="Kakao login requires both code and redirect_uri.",
+            )
         return get_dev_profile(request)
 
     if request.provider == "google":
@@ -182,7 +188,9 @@ def build_token_response(
     refresh_token: str,
     is_new_user: bool,
 ) -> dict:
-    profile_required = not bool(user.name and user.nickname)
+    profile_required = not bool(
+        user.name and user.nickname and user.gender and user.birth_date
+    )
 
     return {
         "access_token": access_token,
@@ -241,14 +249,19 @@ def social_login(
         if user is None:
             raise HTTPException(status_code=404, detail="User not found.")
     else:
-        user = db.query(User).filter(User.email == social_profile["email"]).first()
+        email = social_profile.get("email")
+        user = None
+
+        if email:
+            user = db.query(User).filter(User.email == email).first()
 
         if user is None:
             user = User(
-                email=social_profile["email"],
+                email=email,
                 password=None,
-                name=social_profile["name"],
-                nickname=social_profile["nickname"],
+                # Collect recommendation-related profile data after social login.
+                name=None,
+                nickname=None,
                 profile_image_url=social_profile["profile_image_url"],
                 status=UserStatus.active,
             )
@@ -321,3 +334,72 @@ def logout(
         db.commit()
 
     return {"message": "logout success"}
+
+
+def verify_kakao_event_token(event_token: str) -> dict:
+    if not KAKAO_REST_API_KEY:
+        raise ValueError("Kakao REST API key is not configured.")
+
+    signing_key = kakao_jwk_client.get_signing_key_from_jwt(event_token)
+    return jwt.decode(
+        event_token,
+        signing_key.key,
+        algorithms=["RS256"],
+        audience=KAKAO_REST_API_KEY,
+        issuer=KAKAO_EVENT_ISSUER,
+    )
+
+
+def process_kakao_user_unlinked(provider_user_id: str, db: Session) -> None:
+    social_account = db.query(SocialAccount).filter(
+        SocialAccount.provider == "kakao",
+        SocialAccount.provider_user_id == provider_user_id,
+    ).first()
+
+    if social_account is None:
+        return
+
+    user_id = social_account.user_id
+    db.delete(social_account)
+    db.flush()
+
+    remaining_social_accounts = db.query(SocialAccount).filter(
+        SocialAccount.user_id == user_id,
+    ).count()
+
+    db.query(RefreshToken).filter(
+        RefreshToken.user_id == user_id,
+        RefreshToken.revoked_at.is_(None),
+    ).update({RefreshToken.revoked_at: datetime.utcnow()})
+
+    if remaining_social_accounts == 0:
+        user = db.get(User, user_id)
+        if user and user.status == UserStatus.active:
+            user.status = UserStatus.deleted
+            user.deleted_at = datetime.utcnow()
+
+    db.commit()
+
+
+@router.post("/kakao/unlink-webhook", status_code=status.HTTP_202_ACCEPTED)
+async def kakao_account_status_webhook(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Receive and verify Kakao's signed Security Event Token (SET)."""
+    event_token = (await request.body()).decode("utf-8").strip()
+
+    try:
+        payload = verify_kakao_event_token(event_token)
+    except Exception as exc:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"err": "invalid_request", "description": str(exc)},
+        )
+
+    if KAKAO_USER_UNLINKED_EVENT in (payload.get("events") or {}):
+        provider_user_id = str(payload.get("sub", ""))
+        if provider_user_id:
+            process_kakao_user_unlinked(provider_user_id, db)
+
+    return Response(status_code=status.HTTP_202_ACCEPTED)

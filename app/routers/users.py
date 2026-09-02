@@ -27,24 +27,34 @@ def calculate_age(birth_date: date) -> int:
 @router.post("/me/profile", response_model=UserResponse)
 def create_user_profile(
     request: UserProfileCreate,
+    current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
-    existing_user = db.query(User).filter(User.email == request.email).first()
+    user = db.query(User).filter(
+        User.user_id == current_user_id,
+        User.status == UserStatus.active,
+    ).first()
 
-    if existing_user:
-        raise HTTPException(status_code=409, detail="Email already exists.")
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found.")
 
-    user = User(
-        email=request.email,
-        password=None,
-        name=request.name,
-        nickname=request.nickname,
-        gender=request.gender,
-        birth_date=request.birth_date,
-        age=calculate_age(request.birth_date),
-    )
+    nickname_owner = db.query(User).filter(
+        User.nickname == request.nickname,
+        User.user_id != current_user_id,
+    ).first()
 
-    db.add(user)
+    if nickname_owner:
+        raise HTTPException(status_code=409, detail="Nickname already exists.")
+
+    user.name = request.name
+    user.nickname = request.nickname
+    user.gender = request.gender
+    user.birth_date = request.birth_date
+    user.age = calculate_age(request.birth_date)
+
+    if request.profile_image_url is not None:
+        user.profile_image_url = request.profile_image_url
+
     db.commit()
     db.refresh(user)
 
@@ -85,6 +95,14 @@ def update_my_profile(
 
     if "birth_date" in update_data and update_data["birth_date"] is not None:
         update_data["age"] = calculate_age(update_data["birth_date"])
+
+    if "nickname" in update_data and update_data["nickname"] is not None:
+        nickname_owner = db.query(User).filter(
+            User.nickname == update_data["nickname"],
+            User.user_id != current_user_id,
+        ).first()
+        if nickname_owner:
+            raise HTTPException(status_code=409, detail="Nickname already exists.")
 
     for key, value in update_data.items():
         setattr(user, key, value)

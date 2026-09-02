@@ -14,7 +14,7 @@ class SocialLoginRequest(BaseModel):
 
 class AuthUserResponse(BaseModel):
     user_id: int
-    email: str
+    email: str | None
     name: str | None
     nickname: str | None
     profile_image_url: str | None
@@ -25,7 +25,7 @@ class TokenResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     user_id: int
-    email: str
+    email: str | None
     is_new_user: bool
     profile_required: bool
     user: AuthUserResponse

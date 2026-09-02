@@ -1,14 +1,14 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 
 class UserProfileCreate(BaseModel):
-    email: EmailStr
     name: str
     nickname: str
     gender: str
     birth_date: date
+    profile_image_url: str | None = None
 
 
 class UserProfileUpdate(BaseModel):
@@ -21,7 +21,7 @@ class UserProfileUpdate(BaseModel):
 
 class UserResponse(BaseModel):
     user_id: int
-    email: str
+    email: str | None
     name: str | None
     nickname: str | None
     gender: str | None
