@@ -119,6 +119,16 @@ def health_check():
     }
 
 
+@app.get("/api/v1")
+def api_root():
+    return {
+        "service": "hyangdam-backend",
+        "version": "0.1.0",
+        "docs": "/docs",
+        "health": "/api/v1/health",
+    }
+
+
 @app.get("/api/v1/categories")
 def get_categories():
     categories = {}
