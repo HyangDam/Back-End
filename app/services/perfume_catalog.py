@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 import pandas as pd
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -31,6 +33,7 @@ def perfume_to_response(
     perfume: Perfume,
     include_description: bool = False,
     like_count: int = 0,
+    weekly_like_count: int | None = None,
 ) -> dict:
     categories = get_perfume_categories(perfume)
     result = {
@@ -43,6 +46,9 @@ def perfume_to_response(
         "category": categories[0] if categories else None,
         "categories": categories,
     }
+
+    if weekly_like_count is not None:
+        result["weekly_like_count"] = weekly_like_count
 
     if include_description:
         result["description"] = perfume.description
@@ -140,9 +146,26 @@ def search_perfumes(
         .subquery()
     )
     like_count = func.coalesce(like_counts.c.like_count, 0).label("like_count")
+    weekly_like_counts = (
+        db.query(
+            Like.perfume_id.label("perfume_id"),
+            func.count(Like.id).label("weekly_like_count"),
+        )
+        .filter(Like.created_at >= datetime.utcnow() - timedelta(days=7))
+        .group_by(Like.perfume_id)
+        .subquery()
+    )
+    weekly_like_count = func.coalesce(
+        weekly_like_counts.c.weekly_like_count,
+        0,
+    ).label("weekly_like_count")
     query = db.query(Perfume, like_count).outerjoin(
         like_counts,
         like_counts.c.perfume_id == Perfume.perfume_id,
+    )
+    query = query.add_columns(weekly_like_count).outerjoin(
+        weekly_like_counts,
+        weekly_like_counts.c.perfume_id == Perfume.perfume_id,
     )
 
     if keyword:
@@ -169,16 +192,28 @@ def search_perfumes(
 
     if sort == "popular":
         query = query.order_by(like_count.desc(), Perfume.perfume_id.asc())
+    elif sort == "weekly_popular":
+        query = query.order_by(
+            weekly_like_count.desc(),
+            like_count.desc(),
+            Perfume.perfume_id.asc(),
+        )
     elif sort == "name":
         query = query.order_by(Perfume.name.asc(), Perfume.perfume_id.asc())
     else:
-        raise ValueError("Unsupported sort. Available values: popular, name")
+        raise ValueError(
+            "Unsupported sort. Available values: popular, weekly_popular, name"
+        )
 
     rows = query.offset((page - 1) * size).limit(size).all()
     return (
         [
-            perfume_to_response(perfume, like_count=int(count))
-            for perfume, count in rows
+            perfume_to_response(
+                perfume,
+                like_count=int(total_count),
+                weekly_like_count=int(weekly_count),
+            )
+            for perfume, total_count, weekly_count in rows
         ],
         total,
     )

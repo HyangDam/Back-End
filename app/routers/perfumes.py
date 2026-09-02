@@ -20,7 +20,10 @@ def search_perfumes(
         default=None,
         description="향 계열. category=floral&category=citrus 또는 category=floral,citrus",
     ),
-    sort: str = Query(default="popular", pattern="^(popular|name)$"),
+    sort: str = Query(
+        default="popular",
+        pattern="^(popular|weekly_popular|name)$",
+    ),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=50),
     limit: int | None = Query(
