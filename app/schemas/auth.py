@@ -3,10 +3,21 @@ from pydantic import BaseModel, EmailStr
 
 class SocialLoginRequest(BaseModel):
     provider: str
-    provider_user_id: str
-    email: EmailStr
+    provider_token: str | None = None
+    code: str | None = None
+    redirect_uri: str | None = None
+    provider_user_id: str | None = None
+    email: EmailStr | None = None
     name: str | None = None
     nickname: str | None = None
+
+
+class AuthUserResponse(BaseModel):
+    user_id: int
+    email: str
+    name: str | None
+    nickname: str | None
+    profile_image_url: str | None
 
 
 class TokenResponse(BaseModel):
@@ -17,6 +28,7 @@ class TokenResponse(BaseModel):
     email: str
     is_new_user: bool
     profile_required: bool
+    user: AuthUserResponse
 
 
 class RefreshTokenRequest(BaseModel):
