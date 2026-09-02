@@ -18,8 +18,8 @@ from app.services.perfume_catalog import get_perfume_or_none
 router = APIRouter(prefix="/api/v1", tags=["Perfume Interactions"])
 
 
-def get_perfume_or_404(perfume_id: int):
-    perfume = get_perfume_or_none(perfume_id)
+def get_perfume_or_404(db: Session, perfume_id: int):
+    perfume = get_perfume_or_none(db, perfume_id)
 
     if perfume is None:
         raise HTTPException(status_code=404, detail="Perfume not found.")
@@ -44,14 +44,14 @@ def get_review_count(db: Session, perfume_id: int) -> int:
     ).scalar()
 
 
-def review_to_response(review: PerfumeReview):
+def review_to_response(db: Session, review: PerfumeReview):
     return {
         "review_id": review.review_id,
         "user_id": review.user_id,
         "perfume_id": review.perfume_id,
         "rating": review.rating,
         "content": review.content,
-        "perfume": get_perfume_or_none(review.perfume_id),
+        "perfume": get_perfume_or_none(db, review.perfume_id),
         "created_at": review.created_at,
         "updated_at": review.updated_at,
     }
@@ -62,7 +62,7 @@ def get_perfume_detail(
     perfume_id: int,
     db: Session = Depends(get_db),
 ):
-    perfume = get_perfume_or_404(perfume_id)
+    perfume = get_perfume_or_404(db, perfume_id)
 
     return {
         **perfume,
@@ -78,7 +78,7 @@ def like_perfume(
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
-    get_perfume_or_404(perfume_id)
+    get_perfume_or_404(db, perfume_id)
 
     existing_like = db.query(Like).filter(
         Like.user_id == current_user_id,
@@ -103,7 +103,7 @@ def unlike_perfume(
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
-    get_perfume_or_404(perfume_id)
+    get_perfume_or_404(db, perfume_id)
 
     like = db.query(Like).filter(
         Like.user_id == current_user_id,
@@ -136,7 +136,7 @@ def get_my_liked_perfumes(
             {
                 "id": like.id,
                 "perfume_id": like.perfume_id,
-                "perfume": get_perfume_or_none(like.perfume_id),
+                "perfume": get_perfume_or_none(db, like.perfume_id),
                 "created_at": like.created_at,
             }
             for like in likes
@@ -150,7 +150,7 @@ def add_my_perfume(
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
-    perfume = get_perfume_or_404(request.perfume_id)
+    perfume = get_perfume_or_404(db, request.perfume_id)
 
     existing_perfume = db.query(UserPerfume).filter(
         UserPerfume.user_id == current_user_id,
@@ -219,7 +219,7 @@ def get_my_perfumes(
                 "id": item.id,
                 "perfume_id": item.perfume_id,
                 "status": item.status,
-                "perfume": get_perfume_or_none(item.perfume_id),
+                "perfume": get_perfume_or_none(db, item.perfume_id),
                 "created_at": item.created_at,
             }
             for item in user_perfumes
@@ -232,7 +232,7 @@ def get_perfume_reviews(
     perfume_id: int,
     db: Session = Depends(get_db),
 ):
-    get_perfume_or_404(perfume_id)
+    get_perfume_or_404(db, perfume_id)
 
     reviews = db.query(PerfumeReview).filter(
         PerfumeReview.perfume_id == perfume_id,
@@ -241,7 +241,7 @@ def get_perfume_reviews(
     return {
         "perfume_id": perfume_id,
         "review_count": len(reviews),
-        "results": [review_to_response(review) for review in reviews],
+        "results": [review_to_response(db, review) for review in reviews],
     }
 
 
@@ -252,7 +252,7 @@ def create_perfume_review(
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
-    get_perfume_or_404(perfume_id)
+    get_perfume_or_404(db, perfume_id)
 
     owned_perfume = db.query(UserPerfume).filter(
         UserPerfume.user_id == current_user_id,
@@ -285,7 +285,7 @@ def create_perfume_review(
     db.commit()
     db.refresh(review)
 
-    return review_to_response(review)
+    return review_to_response(db, review)
 
 
 @router.patch("/reviews/{review_id}", response_model=ReviewResponse)
@@ -311,7 +311,7 @@ def update_perfume_review(
     db.commit()
     db.refresh(review)
 
-    return review_to_response(review)
+    return review_to_response(db, review)
 
 
 @router.delete("/reviews/{review_id}")
@@ -349,5 +349,5 @@ def get_my_reviews(
 
     return {
         "user_id": current_user_id,
-        "results": [review_to_response(review) for review in reviews],
+        "results": [review_to_response(db, review) for review in reviews],
     }

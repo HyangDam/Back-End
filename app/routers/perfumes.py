@@ -1,6 +1,11 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
 
-from app.services.perfume_catalog import search_perfumes_from_csv
+from app.database import get_db
+from app.services.perfume_catalog import (
+    get_popular_brands as get_popular_brands_from_db,
+    search_perfumes as search_perfumes_from_db,
+)
 
 router = APIRouter(
     prefix="/api/v1",
@@ -12,36 +17,19 @@ router = APIRouter(
 def search_perfumes(
     keyword: str = Query(default=""),
     limit: int = Query(default=10, ge=1, le=30),
+    db: Session = Depends(get_db),
 ):
     return {
         "keyword": keyword,
-        "results": search_perfumes_from_csv(keyword=keyword, limit=limit),
+        "results": search_perfumes_from_db(db=db, keyword=keyword, limit=limit),
     }
 
 
 @router.get("/brands/popular")
 def get_popular_brands(
     limit: int = Query(default=10, ge=1, le=30),
+    db: Session = Depends(get_db),
 ):
-    from app.services.perfume_catalog import get_perfume_data
-
-    df = get_perfume_data()
-
-    brand_counts = (
-        df["Brand"]
-        .dropna()
-        .astype(str)
-        .str.strip()
-        .value_counts()
-        .head(limit)
-    )
-
     return {
-        "brands": [
-            {
-                "brand": brand,
-                "count": int(count),
-            }
-            for brand, count in brand_counts.items()
-        ]
+        "brands": get_popular_brands_from_db(db=db, limit=limit)
     }

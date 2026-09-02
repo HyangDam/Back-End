@@ -4,9 +4,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from app.database import Base, engine
+from app.database import Base, SessionLocal, engine
 from app.models import auth
 from app.models import onboarding
+from app.models import perfume
 from app.models import user
 from app.routers import auth as auth_router
 from app.routers import onboarding as onboarding_router
@@ -16,6 +17,7 @@ from app.services.recommender import AVOID_KEYWORDS, CATEGORY_KEYWORDS, PerfumeR
 from app.routers import perfumes
 from app.models import perfume_interaction
 from app.routers import perfume_interactions
+from app.services.perfume_catalog import seed_perfumes_from_csv
 
 app = FastAPI(
     title="HyangDam API",
@@ -24,6 +26,9 @@ app = FastAPI(
 )
 
 Base.metadata.create_all(bind=engine)
+
+with SessionLocal() as db:
+    seed_perfumes_from_csv(db)
 
 app.include_router(users.router)
 app.include_router(onboarding_router.router)
