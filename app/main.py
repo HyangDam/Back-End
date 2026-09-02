@@ -1,4 +1,5 @@
 from typing import Any
+import os
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,6 +19,7 @@ from app.routers import perfumes
 from app.models import perfume_interaction
 from app.routers import perfume_interactions
 from app.services.perfume_catalog import seed_perfumes_from_csv
+from app.services.demo_data import seed_demo_reviews
 
 app = FastAPI(
     title="HyangDam API",
@@ -29,6 +31,8 @@ Base.metadata.create_all(bind=engine)
 
 with SessionLocal() as db:
     seed_perfumes_from_csv(db)
+    if os.getenv("SEED_DEMO_DATA", "false").lower() == "true":
+        seed_demo_reviews(db)
 
 app.include_router(users.router)
 app.include_router(onboarding_router.router)
