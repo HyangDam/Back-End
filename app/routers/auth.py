@@ -1,5 +1,6 @@
 from datetime import datetime
 import json
+import logging
 import os
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -30,6 +31,8 @@ router = APIRouter(
     prefix="/api/v1/auth",
     tags=["Auth"],
 )
+
+logger = logging.getLogger(__name__)
 
 KAKAO_TOKEN_URL = "https://kauth.kakao.com/oauth/token"
 KAKAO_USER_INFO_URL = "https://kapi.kakao.com/v2/user/me"
@@ -82,6 +85,13 @@ def request_json(
 def get_kakao_profile(code: str, redirect_uri: str) -> dict:
     if not KAKAO_REST_API_KEY:
         raise HTTPException(status_code=500, detail="Kakao REST API key is not configured.")
+
+    logger.info(
+        "Kakao token exchange requested (client_id_suffix=%s, redirect_uri=%s)",
+        KAKAO_REST_API_KEY[-4:],
+        redirect_uri,
+    )
+
     form_data = {
         "grant_type": "authorization_code",
         "client_id": KAKAO_REST_API_KEY,
@@ -135,8 +145,9 @@ def get_google_profile(provider_token: str) -> dict:
         "provider": "google",
         "provider_user_id": user_response["sub"],
         "email": email,
-        "name": user_response.get("name"),
-        "nickname": user_response.get("name"),
+        "name": user_response.get("name") or user_response.get("given_name"),
+        # Google display names are not guaranteed to be unique in our service.
+        "nickname": None,
         "profile_image_url": user_response.get("picture"),
     }
 
@@ -210,6 +221,45 @@ def build_token_response(
     }
 
 
+def get_available_nickname(db: Session, candidate: str | None) -> str | None:
+    if not candidate:
+        return None
+
+    nickname = candidate.strip()[:50]
+    if not nickname:
+        return None
+
+    exists = db.query(User.user_id).filter(User.nickname == nickname).first()
+    return None if exists else nickname
+
+
+def fill_missing_social_profile(
+    user: User,
+    social_profile: dict,
+    db: Session,
+) -> None:
+    """Use social profile values only until the user completes the service profile."""
+    updated = False
+
+    if not user.name and social_profile.get("name"):
+        user.name = social_profile["name"]
+        updated = True
+
+    if not user.nickname:
+        nickname = get_available_nickname(db, social_profile.get("nickname"))
+        if nickname:
+            user.nickname = nickname
+            updated = True
+
+    if not user.profile_image_url and social_profile.get("profile_image_url"):
+        user.profile_image_url = social_profile["profile_image_url"]
+        updated = True
+
+    if updated:
+        db.commit()
+        db.refresh(user)
+
+
 def issue_tokens(user_id: int, db: Session) -> tuple[str, str]:
     access_token = create_access_token(user_id)
     refresh_token, expires_at = create_refresh_token()
@@ -248,6 +298,8 @@ def social_login(
 
         if user is None:
             raise HTTPException(status_code=404, detail="User not found.")
+
+        fill_missing_social_profile(user, social_profile, db)
     else:
         email = social_profile.get("email")
         user = None
@@ -260,8 +312,8 @@ def social_login(
                 email=email,
                 password=None,
                 # Collect recommendation-related profile data after social login.
-                name=None,
-                nickname=None,
+                name=social_profile.get("name"),
+                nickname=get_available_nickname(db, social_profile.get("nickname")),
                 profile_image_url=social_profile["profile_image_url"],
                 status=UserStatus.active,
             )
@@ -269,6 +321,8 @@ def social_login(
             db.commit()
             db.refresh(user)
             is_new_user = True
+
+        fill_missing_social_profile(user, social_profile, db)
 
         social_account = SocialAccount(
             user_id=user.user_id,
