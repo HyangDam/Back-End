@@ -6,8 +6,13 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
+from app.services.note_normalizer import normalize_note_text, normalize_note_token
+
 BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_PATH = BASE_DIR / "data" / "perfumes.csv"
+DATA_DIR = BASE_DIR / "data"
+DATA_PATH = DATA_DIR / "perfumes.csv"
+KOREAN_MARKET_DATA_PATH = DATA_DIR / "korean_market_perfumes.csv"
+DESCRIPTION_KO_PATH = DATA_DIR / "perfume_descriptions_ko.csv"
 MAX_AUTO_KEYWORDS_PER_CATEGORY = 80
 
 
@@ -94,19 +99,7 @@ AVOID_KEYWORDS = {
 
 
 def normalize_note(note):
-    normalized = str(note).strip().lower()
-
-    for marker in [
-        "click here for ingredients",
-        "please be aware",
-        "ingredients",
-        "×close",
-    ]:
-        if marker in normalized:
-            normalized = normalized.split(marker)[0]
-
-    normalized = " ".join(normalized.split())
-    return normalized.strip(" .:-")
+    return normalize_note_token(note)
 
 
 def note_matches_seed(note, seed):
@@ -150,24 +143,82 @@ def build_auto_category_keywords(df):
 
 
 def load_perfume_data():
-    df = pd.read_csv(DATA_PATH, encoding="latin1")
+    base_df = pd.read_csv(DATA_PATH, encoding="latin1")
 
     required_columns = ["Name", "Brand", "Description", "Notes", "Image URL"]
-    missing_columns = [column for column in required_columns if column not in df.columns]
+    missing_columns = [column for column in required_columns if column not in base_df.columns]
 
     if missing_columns:
         raise ValueError(f"Missing columns: {missing_columns}")
 
     for column in required_columns:
-        df[column] = df[column].fillna("")
+        base_df[column] = base_df[column].fillna("")
 
-    # Keep recommendation results aligned with perfumes.perfume_id in the DB.
-    df["perfume_id"] = df.index + 1
-    df["notes_text"] = df["Notes"].str.lower()
-    df["desc_text"] = df["Description"].str.lower()
-    df["brand_text"] = df["Brand"].str.lower()
+    # The original CSV keeps its IDs forever.  Existing likes/reviews therefore
+    # stay connected even when a Korean-market catalog is appended later.
+    base_df["perfume_id"] = base_df.index + 1
+    base_df["catalog_key"] = "luckyscent:" + base_df["perfume_id"].astype(str)
+    base_df["catalog_source"] = "kaggle_luckyscent"
+    base_df["Description KR"] = ""
+
+    catalog_frames = [base_df]
+    if KOREAN_MARKET_DATA_PATH.exists():
+        korean_df = pd.read_csv(KOREAN_MARKET_DATA_PATH, encoding="utf-8")
+        korean_missing = [
+            column for column in required_columns if column not in korean_df.columns
+        ]
+        if korean_missing:
+            raise ValueError(
+                f"Missing Korean-market catalog columns: {korean_missing}"
+            )
+
+        for column in required_columns:
+            korean_df[column] = korean_df[column].fillna("")
+
+        korean_df["perfume_id"] = range(
+            len(base_df) + 1,
+            len(base_df) + len(korean_df) + 1,
+        )
+        korean_df["catalog_key"] = (
+            "official:"
+            + korean_df["Brand"].map(_slugify_catalog_part)
+            + ":"
+            + korean_df["Name"].map(_slugify_catalog_part)
+        )
+        korean_df["catalog_source"] = korean_df.get("Source", "official").fillna(
+            "official"
+        )
+        korean_df["Description KR"] = korean_df.get("Summary KR", "").fillna("")
+        catalog_frames.append(korean_df)
+
+    # Different product catalogs are unioned vertically.  Localized description
+    # text describes the same product, so it is joined by catalog_key below.
+    df = pd.concat(catalog_frames, ignore_index=True, sort=False)
+
+    if DESCRIPTION_KO_PATH.exists():
+        descriptions_ko = pd.read_csv(DESCRIPTION_KO_PATH, encoding="utf-8")
+        expected_translation_columns = {"catalog_key", "description_ko"}
+        if expected_translation_columns.issubset(descriptions_ko.columns):
+            df = df.merge(
+                descriptions_ko[["catalog_key", "description_ko"]]
+                .drop_duplicates(subset=["catalog_key"], keep="last"),
+                on="catalog_key",
+                how="left",
+            )
+            df["Description KR"] = df["description_ko"].fillna(df["Description KR"])
+            df = df.drop(columns=["description_ko"])
+
+    # Display text remains intact.  Only comparison text is normalized.
+    df["notes_text"] = df["Notes"].map(normalize_note_text)
+    df["desc_text"] = df["Description"].map(normalize_note_text)
+    df["brand_text"] = df["Brand"].map(normalize_note_text)
 
     return df
+
+
+def _slugify_catalog_part(value: object) -> str:
+    normalized = normalize_note_text(value)
+    return re.sub(r"[^0-9a-z]+", "-", normalized).strip("-") or "unknown"
 
 
 def build_user_query(selected_categories, category_keywords=None):
@@ -253,7 +304,16 @@ class PerfumeRecommender:
         top_indices = final_score.argsort()[::-1][:top_n]
 
         results = self.df.iloc[top_indices][
-            ["perfume_id", "Name", "Brand", "Description", "Notes", "Image URL"]
+            [
+                "perfume_id",
+                "catalog_key",
+                "Name",
+                "Brand",
+                "Description",
+                "Description KR",
+                "Notes",
+                "Image URL",
+            ]
         ].copy()
 
         results["score"] = final_score[top_indices]

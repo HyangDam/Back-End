@@ -4,4 +4,7 @@ __pycache__/
 *.pyc
 app/data/*.csv
 !app/data/perfumes.csv
+!app/data/korean_market_perfumes.csv
+!app/data/korean_market_perfumes_candidates.csv
+!app/data/perfume_descriptions_ko.csv
 .env

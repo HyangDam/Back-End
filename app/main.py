@@ -1,7 +1,7 @@
 from typing import Any
 import os
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -9,10 +9,14 @@ from app.database import Base, SessionLocal, engine
 from app.models import auth
 from app.models import onboarding
 from app.models import perfume
+from app.models import perfume_market
 from app.models import user
 from app.routers import auth as auth_router
 from app.routers import onboarding as onboarding_router
 from app.routers import users
+from app.schemas.chat import ChatRecommendationRequest
+from app.core.chat_rate_limit import ChatRateLimiter
+from app.services.chat_preference_service import analyze_chat_message
 from app.services.preference_extractor import extract_preferences_from_text
 from app.services.recommender import AVOID_KEYWORDS, CATEGORY_KEYWORDS, PerfumeRecommender
 from app.routers import perfumes
@@ -53,6 +57,10 @@ app.add_middleware(
 )
 
 recommender = PerfumeRecommender()
+chat_rate_limiter = ChatRateLimiter(
+    per_minute=int(os.getenv("CHAT_MAX_REQUESTS_PER_MINUTE", "5")),
+    per_day=int(os.getenv("CHAT_MAX_REQUESTS_PER_DAY", "30")),
+)
 
 
 class RecommendationRequest(BaseModel):
@@ -116,6 +124,7 @@ def perfume_results_to_response(results):
             "score": round(float(row["score"]), 4),
             "notes": row["Notes"],
             "description": row["Description"],
+            "description_ko": row["Description KR"],
             "image_url": row["Image URL"],
         }
         for rank, (_, row) in enumerate(results.iterrows(), start=1)
@@ -219,6 +228,40 @@ def recommend_perfumes_by_text(request: TextRecommendationRequest):
             "focus_categories": focus_categories,
             "selected_scores": extracted["selected_scores"],
             "avoid_scores": extracted["avoid_scores"],
+        },
+        "top_n": request.top_n,
+        "results": perfume_results_to_response(results),
+    }
+
+
+@app.post("/api/v1/chat/recommend")
+def chat_recommend_perfumes(
+    request: ChatRecommendationRequest,
+    http_request: Request,
+):
+    """Chat-friendly recommendation endpoint with a replaceable preference analyzer."""
+    forwarded_for = http_request.headers.get("x-forwarded-for", "")
+    client_key = forwarded_for.split(",")[0].strip() or (
+        http_request.client.host if http_request.client else "unknown"
+    )
+    chat_rate_limiter.check(client_key)
+    analysis = analyze_chat_message(request.message)
+
+    results = recommender.recommend(
+        selected_categories=analysis["selected_categories"],
+        avoid_categories=analysis["avoid_categories"],
+        focus_categories=analysis["focus_categories"],
+        top_n=request.top_n,
+    )
+
+    return {
+        "input_message": request.message,
+        "assistant_message": analysis["assistant_message"],
+        "analysis_source": analysis["analysis_source"],
+        "preferences": {
+            "selected_categories": analysis["selected_categories"],
+            "avoid_categories": analysis["avoid_categories"],
+            "focus_categories": analysis["focus_categories"],
         },
         "top_n": request.top_n,
         "results": perfume_results_to_response(results),

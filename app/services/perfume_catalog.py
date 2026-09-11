@@ -1,11 +1,14 @@
 from datetime import datetime, timedelta
 
 import pandas as pd
-from sqlalchemy import func, or_
+from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session
 
 from app.models.like import Like
 from app.models.perfume import Perfume
+from app.models.perfume_market import PerfumeMarketMetadata, PerfumeMarketOffer
+from app.services.note_visualization import build_note_visualization
+from app.services.price_comparison import build_price_comparison
 from app.services.recommender import CATEGORY_KEYWORDS, load_perfume_data
 
 
@@ -13,6 +16,15 @@ def clean_value(value):
     if pd.isna(value):
         return ""
     return str(value)
+
+
+def get_runtime_catalog_record(perfume_id: int) -> dict | None:
+    """Read non-DB display metadata kept alongside the source catalog files."""
+    data = load_perfume_data()
+    matches = data.loc[data["perfume_id"] == perfume_id]
+    if matches.empty:
+        return None
+    return matches.iloc[0].to_dict()
 
 
 def _matches_keyword(text: str, keyword: str) -> bool:
@@ -34,6 +46,8 @@ def perfume_to_response(
     include_description: bool = False,
     like_count: int = 0,
     weekly_like_count: int | None = None,
+    representative_price: int | None = None,
+    released_at=None,
 ) -> dict:
     categories = get_perfume_categories(perfume)
     result = {
@@ -43,6 +57,8 @@ def perfume_to_response(
         "notes": perfume.notes,
         "image_url": perfume.image_url,
         "like_count": like_count,
+        "representative_price": representative_price,
+        "released_at": released_at,
         "category": categories[0] if categories else None,
         "categories": categories,
     }
@@ -52,6 +68,11 @@ def perfume_to_response(
 
     if include_description:
         result["description"] = perfume.description
+        runtime_record = get_runtime_catalog_record(perfume.perfume_id)
+        result["description_ko"] = (
+            str(runtime_record.get("Description KR", "")) if runtime_record else ""
+        )
+        result["note_visualization"] = build_note_visualization(perfume.notes)
 
     return result
 
@@ -109,6 +130,39 @@ def get_perfume_or_none(db: Session, perfume_id: int) -> dict | None:
     )
 
 
+def get_price_comparison(db: Session, perfume_id: int) -> dict | None:
+    perfume = get_perfume_or_none(db, perfume_id)
+    if perfume is None:
+        return None
+
+    runtime_record = get_runtime_catalog_record(perfume_id)
+    source_url = str(runtime_record.get("Source URL", "")) if runtime_record else ""
+    metadata = db.get(PerfumeMarketMetadata, perfume_id)
+    if metadata and metadata.official_product_url:
+        source_url = metadata.official_product_url
+
+    offer_rows = (
+        db.query(PerfumeMarketOffer)
+        .filter(PerfumeMarketOffer.perfume_id == perfume_id)
+        .order_by(
+            case((PerfumeMarketOffer.price_krw.is_(None), 1), else_=0),
+            PerfumeMarketOffer.price_krw.asc(),
+        )
+        .all()
+    )
+    offers = [
+        {
+            "retailer": offer.retailer,
+            "price_krw": offer.price_krw,
+            "capacity_ml": offer.capacity_ml,
+            "url": offer.product_url,
+            "checked_at": offer.checked_at,
+        }
+        for offer in offer_rows
+    ]
+    return build_price_comparison(perfume, source_url=source_url, offers=offers)
+
+
 def normalize_categories(raw_categories: list[str] | None) -> list[str]:
     if not raw_categories:
         return []
@@ -159,6 +213,18 @@ def search_perfumes(
         weekly_like_counts.c.weekly_like_count,
         0,
     ).label("weekly_like_count")
+    minimum_prices = (
+        db.query(
+            PerfumeMarketOffer.perfume_id.label("perfume_id"),
+            func.min(PerfumeMarketOffer.price_krw).label("representative_price"),
+        )
+        .filter(PerfumeMarketOffer.price_krw.is_not(None))
+        .group_by(PerfumeMarketOffer.perfume_id)
+        .subquery()
+    )
+    representative_price = minimum_prices.c.representative_price.label(
+        "representative_price"
+    )
     query = db.query(Perfume, like_count).outerjoin(
         like_counts,
         like_counts.c.perfume_id == Perfume.perfume_id,
@@ -166,6 +232,14 @@ def search_perfumes(
     query = query.add_columns(weekly_like_count).outerjoin(
         weekly_like_counts,
         weekly_like_counts.c.perfume_id == Perfume.perfume_id,
+    )
+    query = query.add_columns(representative_price).outerjoin(
+        minimum_prices,
+        minimum_prices.c.perfume_id == Perfume.perfume_id,
+    )
+    query = query.add_columns(PerfumeMarketMetadata.released_at).outerjoin(
+        PerfumeMarketMetadata,
+        PerfumeMarketMetadata.perfume_id == Perfume.perfume_id,
     )
 
     if keyword:
@@ -200,20 +274,40 @@ def search_perfumes(
         )
     elif sort == "name":
         query = query.order_by(Perfume.name.asc(), Perfume.perfume_id.asc())
+    elif sort == "latest":
+        query = query.order_by(
+            case((PerfumeMarketMetadata.released_at.is_(None), 1), else_=0),
+            PerfumeMarketMetadata.released_at.desc(),
+            Perfume.perfume_id.asc(),
+        )
+    elif sort == "price_asc":
+        query = query.order_by(
+            case((representative_price.is_(None), 1), else_=0),
+            representative_price.asc(),
+            Perfume.perfume_id.asc(),
+        )
+    elif sort == "price_desc":
+        query = query.order_by(
+            case((representative_price.is_(None), 1), else_=0),
+            representative_price.desc(),
+            Perfume.perfume_id.asc(),
+        )
     else:
         raise ValueError(
-            "Unsupported sort. Available values: popular, weekly_popular, name"
+            "Unsupported sort. Available values: popular, weekly_popular, name, latest, price_asc, price_desc"
         )
 
     rows = query.offset((page - 1) * size).limit(size).all()
     return (
         [
-            perfume_to_response(
-                perfume,
-                like_count=int(total_count),
-                weekly_like_count=int(weekly_count),
-            )
-            for perfume, total_count, weekly_count in rows
+                perfume_to_response(
+                    perfume,
+                    like_count=int(total_count),
+                    weekly_like_count=int(weekly_count),
+                    representative_price=int(price) if price is not None else None,
+                    released_at=released_at,
+                )
+            for perfume, total_count, weekly_count, price, released_at in rows
         ],
         total,
     )

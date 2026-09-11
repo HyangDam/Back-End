@@ -13,7 +13,7 @@ from app.schemas.perfume_interaction import (
     UserPerfumeCreate,
     UserPerfumeResponse,
 )
-from app.services.perfume_catalog import get_perfume_or_none
+from app.services.perfume_catalog import get_perfume_or_none, get_price_comparison
 
 router = APIRouter(prefix="/api/v1", tags=["Perfume Interactions"])
 
@@ -70,6 +70,17 @@ def get_perfume_detail(
         "owned_count": get_owned_count(db, perfume_id),
         "review_count": get_review_count(db, perfume_id),
     }
+
+
+@router.get("/perfumes/{perfume_id}/price-comparison")
+def get_perfume_price_comparison(
+    perfume_id: int,
+    db: Session = Depends(get_db),
+):
+    comparison = get_price_comparison(db, perfume_id)
+    if comparison is None:
+        raise HTTPException(status_code=404, detail="Perfume not found.")
+    return comparison
 
 
 @router.post("/perfumes/{perfume_id}/likes", response_model=LikeResponse)

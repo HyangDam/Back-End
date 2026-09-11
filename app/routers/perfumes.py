@@ -22,7 +22,7 @@ def search_perfumes(
     ),
     sort: str = Query(
         default="popular",
-        pattern="^(popular|weekly_popular|name)$",
+        pattern="^(popular|weekly_popular|name|latest|price_asc|price_desc)$",
     ),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=50),

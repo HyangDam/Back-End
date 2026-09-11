@@ -1,0 +1,41 @@
+priority,market_group,brand,product_name,product_name_ko,official_site,collection_status,reason
+1,korean_brand,NONFICTION,GAIAC FLOWER Eau de Parfum,가이악 플라워,https://nonfiction.com/,catalog_added,국내 대표 향수 브랜드의 우디 플로럴 제품
+2,korean_brand,NONFICTION,GENTLE NIGHT Eau de Parfum,젠틀 나이트,https://nonfiction.com/,catalog_added,국내 인지도 높은 티 우디 계열 제품
+3,korean_brand,NONFICTION,SANTAL CREAM Eau de Parfum,상탈 크림,https://nonfiction.com/,catalog_added,샌달우드 중심의 대표 우디 계열 제품
+4,korean_brand,NONFICTION,FOR REST Eau de Parfum,포 레스트,https://nonfiction.com/,catalog_added,휴식과 포근함 수요를 검증할 제품
+5,korean_brand,NONFICTION,THE ROSE Eau de Parfum,더 로즈,https://nonfiction.com/,catalog_added,플로럴 추천 결과 보강용 제품
+6,korean_brand,NONFICTION,IN THE SHOWER Eau de Parfum,인 더 샤워,https://nonfiction.com/,catalog_added,청량한 우디 시트러스 수요 보강용 제품
+7,korean_brand,NONFICTION,NEROLI DREAM Eau de Parfum,네롤리 드림,https://nonfiction.com/,catalog_added,시트러스 플로럴 수요 보강용 제품
+8,korean_brand,NONFICTION,YOUNG MEMORIES Eau de Parfum,영 메모리즈,https://nonfiction.com/,catalog_added,그린 프레시 수요 보강용 제품
+9,korean_brand,NONFICTION,THE BEIGE Eau de Parfum,더 베이지,https://nonfiction.com/,catalog_added,머스크 파우더리 수요 보강용 제품
+10,korean_brand,NONFICTION,THE GREY Eau de Parfum,더 그레이,https://nonfiction.com/,catalog_added,다크 머스크 수요 보강용 제품
+11,korean_brand,TAMBURINS,CHAMO Perfume,카모 퍼퓸,https://www.tamburins.com/,ready_to_collect,국내 인지도 높은 브랜드의 대표 향수 후보
+12,korean_brand,TAMBURINS,HOLY METAL Perfume,홀리 메탈 퍼퓸,https://www.tamburins.com/,ready_to_collect,국내 인지도 높은 브랜드의 대표 향수 후보
+13,korean_brand,TAMBURINS,LALE Perfume,랄레 퍼퓸,https://www.tamburins.com/,ready_to_collect,플로럴 계열 후보
+14,korean_brand,TAMBURINS,BERGA SANDAL Perfume,베르가 샌달 퍼퓸,https://www.tamburins.com/,ready_to_collect,시트러스 우디 계열 후보
+15,korean_brand,TAMBURINS,LATE AUTUMN Perfume,레이트 어텀 퍼퓸,https://www.tamburins.com/,ready_to_collect,따뜻한 계절성 향수 후보
+16,korean_brand,SW19,6 Eau de Parfum,SW19 6,https://sw19official.com/,ready_to_collect,국내 향수 브랜드 대표 제품 후보
+17,korean_brand,SW19,9 Eau de Parfum,SW19 9,https://sw19official.com/,ready_to_collect,국내 향수 브랜드 대표 제품 후보
+18,korean_brand,SW19,Midnight Eau de Parfum,SW19 미드나잇,https://sw19official.com/,ready_to_collect,국내 향수 브랜드 대표 제품 후보
+19,korean_brand,SW19,3 Eau de Parfum,SW19 3,https://sw19official.com/,ready_to_collect,국내 향수 브랜드 대표 제품 후보
+20,korean_brand,SW19,8 Eau de Parfum,SW19 8,https://sw19official.com/,ready_to_collect,국내 향수 브랜드 대표 제품 후보
+21,korean_market_global,Dior,Miss Dior Eau de Parfum,미스 디올 오 드 퍼퓸,https://www.dior.com/ko_kr/beauty,ready_to_collect,한국에서 익숙한 플로럴 대표 제품
+22,korean_market_global,Dior,J'adore Eau de Parfum,쟈도르 오 드 퍼퓸,https://www.dior.com/ko_kr/beauty,ready_to_collect,한국에서 익숙한 플로럴 대표 제품
+23,korean_market_global,Dior,Sauvage Eau de Toilette,소바쥬 오 드 뚜왈렛,https://www.dior.com/ko_kr/beauty,ready_to_collect,남성 및 공용 추천 보강용 제품
+24,korean_market_global,Jo Malone London,English Pear & Freesia Cologne,잉글리쉬 페어 앤 프리지아 코롱,https://www.jomalone.co.kr/,ready_to_collect,국내 인지도 높은 프루티 플로럴 제품
+25,korean_market_global,Jo Malone London,Wood Sage & Sea Salt Cologne,우드 세이지 앤 씨 솔트 코롱,https://www.jomalone.co.kr/,ready_to_collect,청량한 우디 아쿠아틱 제품
+26,korean_market_global,Jo Malone London,Lime Basil & Mandarin Cologne,라임 바질 앤 만다린 코롱,https://www.jomalone.co.kr/,ready_to_collect,시트러스 그린 제품
+27,korean_market_global,BYREDO,Blanche Eau de Parfum,블랑쉬 오 드 퍼퓸,https://www.byredo.com/ko_kr,ready_to_collect,깨끗한 머스크 수요 보강용 제품
+28,korean_market_global,BYREDO,Bal d'Afrique Eau de Parfum,발 다프리크 오 드 퍼퓸,https://www.byredo.com/ko_kr,ready_to_collect,우디 시트러스 수요 보강용 제품
+29,korean_market_global,BYREDO,Mojave Ghost Eau de Parfum,모하비 고스트 오 드 퍼퓸,https://www.byredo.com/ko_kr,ready_to_collect,머스크 우디 수요 보강용 제품
+30,korean_market_global,Diptyque,Philosykos Eau de Parfum,필로시코스 오 드 퍼퓸,https://www.diptyqueparis.com/,ready_to_collect,무화과 그린 우디 수요 보강용 제품
+31,korean_market_global,Diptyque,Eau Rose Eau de Parfum,오 로즈 오 드 퍼퓸,https://www.diptyqueparis.com/,ready_to_collect,장미 플로럴 수요 보강용 제품
+32,korean_market_global,Diptyque,Do Son Eau de Parfum,도 손 오 드 퍼퓸,https://www.diptyqueparis.com/,ready_to_collect,화이트 플로럴 수요 보강용 제품
+33,korean_market_global,Le Labo,Santal 33 Eau de Parfum,상탈 33 오 드 퍼퓸,https://www.lelabofragrances.com/,ready_to_collect,국내 인지도 높은 우디 제품
+34,korean_market_global,Le Labo,ANOTHER 13 Eau de Parfum,어나더 13 오 드 퍼퓸,https://www.lelabofragrances.com/,ready_to_collect,머스크 계열 대표 제품
+35,korean_market_global,Le Labo,THÉ MATCHA 26 Eau de Parfum,떼 마차 26 오 드 퍼퓸,https://www.lelabofragrances.com/,ready_to_collect,티 계열 수요 보강용 제품
+36,korean_market_global,Maison Margiela,REPLICA Lazy Sunday Morning,레이지 선데이 모닝,https://www.maisonmargiela-fragrances.eu/,ready_to_collect,깨끗한 파우더리 머스크 제품
+37,korean_market_global,Maison Margiela,REPLICA Jazz Club,재즈 클럽,https://www.maisonmargiela-fragrances.eu/,ready_to_collect,따뜻한 우디 계열 제품
+38,korean_market_global,Maison Margiela,REPLICA By the Fireplace,바이 더 파이어플레이스,https://www.maisonmargiela-fragrances.eu/,ready_to_collect,겨울 포근함 수요 보강용 제품
+39,korean_market_global,CHANEL,CHANCE EAU TENDRE Eau de Parfum,샹스 오 땅드르 오 드 퍼퓸,https://www.chanel.com/kr/,ready_to_collect,프루티 플로럴 수요 보강용 제품
+40,korean_market_global,CHANEL,COCO MADEMOISELLE Eau de Parfum,코코 마드모아젤 오 드 퍼퓸,https://www.chanel.com/kr/,ready_to_collect,우아한 시트러스 플로럴 제품
