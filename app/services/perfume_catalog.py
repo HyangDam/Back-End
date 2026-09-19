@@ -27,18 +27,15 @@ def get_runtime_catalog_record(perfume_id: int) -> dict | None:
     return matches.iloc[0].to_dict()
 
 
-def _matches_keyword(text: str, keyword: str) -> bool:
-    return keyword.lower() in text.lower()
-
-
 def get_perfume_categories(perfume: Perfume) -> list[str]:
-    searchable_text = f"{perfume.name} {perfume.notes} {perfume.description}"
-    categories = [
-        category
-        for category, keywords in CATEGORY_KEYWORDS.items()
-        if any(_matches_keyword(searchable_text, keyword) for keyword in keywords)
-    ]
-    return categories
+    """Return display categories derived from actual perfume notes.
+
+    Situation labels such as ``date`` are recommendation inputs, not perfume
+    taxonomy. Reusing the note-visualization accords keeps list filtering and
+    detail-page labels consistent.
+    """
+    visualization = build_note_visualization(perfume.notes)
+    return [accord["id"] for accord in visualization["accord_bars"]]
 
 
 def perfume_to_response(
