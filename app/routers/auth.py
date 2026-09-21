@@ -87,8 +87,10 @@ def get_kakao_profile(code: str, redirect_uri: str) -> dict:
         raise HTTPException(status_code=500, detail="Kakao REST API key is not configured.")
 
     logger.info(
-        "Kakao token exchange requested (client_id_suffix=%s, redirect_uri=%s)",
+        "Kakao token exchange requested "
+        "(rest_api_key_suffix=%s, client_secret_configured=%s, redirect_uri=%s)",
         KAKAO_REST_API_KEY[-4:],
+        bool(KAKAO_CLIENT_SECRET),
         redirect_uri,
     )
 
