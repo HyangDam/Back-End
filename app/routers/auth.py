@@ -42,8 +42,8 @@ KAKAO_USER_UNLINKED_EVENT = (
     "https://schemas.openid.net/secevent/oauth/event-type/user-unlinked"
 )
 GOOGLE_USER_INFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
-KAKAO_REST_API_KEY = os.getenv("KAKAO_REST_API_KEY")
-KAKAO_CLIENT_SECRET = os.getenv("KAKAO_CLIENT_SECRET")
+KAKAO_REST_API_KEY = os.getenv("KAKAO_REST_API_KEY", "").strip()
+KAKAO_CLIENT_SECRET = os.getenv("KAKAO_CLIENT_SECRET", "").strip()
 ALLOW_DEV_SOCIAL_LOGIN = os.getenv("ALLOW_DEV_SOCIAL_LOGIN", "false").lower() == "true"
 kakao_jwk_client = jwt.PyJWKClient(KAKAO_JWKS_URL, cache_keys=True)
 
@@ -88,9 +88,12 @@ def get_kakao_profile(code: str, redirect_uri: str) -> dict:
 
     logger.info(
         "Kakao token exchange requested "
-        "(rest_api_key_suffix=%s, client_secret_configured=%s, redirect_uri=%s)",
+        "(rest_api_key_suffix=%s, rest_api_key_length=%s, "
+        "client_secret_configured=%s, client_secret_length=%s, redirect_uri=%s)",
         KAKAO_REST_API_KEY[-4:],
+        len(KAKAO_REST_API_KEY),
         bool(KAKAO_CLIENT_SECRET),
+        len(KAKAO_CLIENT_SECRET),
         redirect_uri,
     )
 
