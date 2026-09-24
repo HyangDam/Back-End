@@ -1,4 +1,6 @@
 from datetime import datetime, timedelta
+from functools import lru_cache
+from pathlib import Path
 
 import pandas as pd
 from sqlalchemy import case, func, or_
@@ -12,19 +14,58 @@ from app.services.price_comparison import build_price_comparison
 from app.services.recommender import CATEGORY_KEYWORDS, load_perfume_data
 
 
+DATA_DIR = Path(__file__).resolve().parents[1] / "data"
+MARKET_METADATA_PATH = DATA_DIR / "perfume_market_metadata.csv"
+MARKET_OFFERS_PATH = DATA_DIR / "perfume_market_offers.csv"
+
+
 def clean_value(value):
     if pd.isna(value):
         return ""
     return str(value)
 
 
+@lru_cache(maxsize=1)
+def _runtime_catalog_records_by_id() -> dict[int, dict]:
+    """Cache static CSV display metadata for list and detail responses."""
+    data = load_perfume_data()
+    return {
+        int(row["perfume_id"]): row.to_dict()
+        for _, row in data.iterrows()
+    }
+
+
 def get_runtime_catalog_record(perfume_id: int) -> dict | None:
     """Read non-DB display metadata kept alongside the source catalog files."""
-    data = load_perfume_data()
-    matches = data.loc[data["perfume_id"] == perfume_id]
-    if matches.empty:
-        return None
-    return matches.iloc[0].to_dict()
+    return _runtime_catalog_records_by_id().get(perfume_id)
+
+
+def _localized_value(record: dict | None, field: str, fallback: str) -> str:
+    if record is None:
+        return fallback
+    value = record.get(field)
+    if value is None or pd.isna(value):
+        return fallback
+    text = str(value).strip()
+    return text or fallback
+
+
+@lru_cache(maxsize=256)
+def _runtime_keyword_matches(keyword: str) -> list[int]:
+    """Find catalog IDs by Korean product, brand, or note labels kept in CSV."""
+    normalized_keyword = keyword.strip().casefold()
+    if not normalized_keyword:
+        return []
+
+    searchable_columns = ["Name KR", "Brand KR", "Notes KR", "Summary KR"]
+    matches = []
+    for perfume_id, record in _runtime_catalog_records_by_id().items():
+        if any(
+            normalized_keyword in str(record.get(column, "")).casefold()
+            for column in searchable_columns
+        ):
+            matches.append(perfume_id)
+    return matches
 
 
 def get_perfume_categories(perfume: Perfume) -> list[str]:
@@ -47,11 +88,21 @@ def perfume_to_response(
     released_at=None,
 ) -> dict:
     categories = get_perfume_categories(perfume)
+    runtime_record = get_runtime_catalog_record(perfume.perfume_id)
+    name_ko = _localized_value(runtime_record, "Name KR", perfume.name)
+    brand_ko = _localized_value(runtime_record, "Brand KR", perfume.brand)
+    notes_ko = _localized_value(runtime_record, "Notes KR", perfume.notes)
     result = {
         "perfume_id": perfume.perfume_id,
         "name": perfume.name,
         "brand": perfume.brand,
         "notes": perfume.notes,
+        "name_ko": name_ko,
+        "brand_ko": brand_ko,
+        "notes_ko": notes_ko,
+        "display_name": name_ko,
+        "display_brand": brand_ko,
+        "display_notes": notes_ko,
         "image_url": perfume.image_url,
         "like_count": like_count,
         "representative_price": representative_price,
@@ -65,10 +116,13 @@ def perfume_to_response(
 
     if include_description:
         result["description"] = perfume.description
-        runtime_record = get_runtime_catalog_record(perfume.perfume_id)
-        result["description_ko"] = (
-            str(runtime_record.get("Description KR", "")) if runtime_record else ""
+        description_ko = _localized_value(
+            runtime_record,
+            "Description KR",
+            perfume.description,
         )
+        result["description_ko"] = description_ko
+        result["display_description"] = description_ko
         result["note_visualization"] = build_note_visualization(perfume.notes)
 
     return result
@@ -104,6 +158,101 @@ def seed_perfumes_from_csv(db: Session) -> int:
         db.commit()
 
     return len(records)
+
+
+def _optional_text(value) -> str | None:
+    if pd.isna(value):
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _optional_date(value):
+    text = _optional_text(value)
+    if text is None:
+        return None
+    return pd.to_datetime(text).date()
+
+
+def _optional_datetime(value):
+    text = _optional_text(value)
+    if text is None:
+        return None
+    return pd.to_datetime(text).to_pydatetime()
+
+
+def _optional_int(value) -> int | None:
+    if pd.isna(value):
+        return None
+    return int(value)
+
+
+def seed_market_data_from_csv(db: Session) -> dict[str, int]:
+    """Upsert manually verified release dates and retail prices from CSV files.
+
+    The source catalog intentionally has no fabricated market data. Only rows
+    placed in these files are eligible for latest sorting or price comparison.
+    """
+    inserted_metadata = 0
+    inserted_offers = 0
+    perfume_ids = {perfume_id for perfume_id, in db.query(Perfume.perfume_id).all()}
+
+    if MARKET_METADATA_PATH.exists():
+        metadata_rows = pd.read_csv(MARKET_METADATA_PATH)
+        for row in metadata_rows.to_dict("records"):
+            perfume_id = int(row["perfume_id"])
+            if perfume_id not in perfume_ids:
+                continue
+
+            metadata = db.get(PerfumeMarketMetadata, perfume_id)
+            if metadata is None:
+                metadata = PerfumeMarketMetadata(perfume_id=perfume_id)
+                db.add(metadata)
+                inserted_metadata += 1
+
+            metadata.released_at = _optional_date(row.get("released_at"))
+            metadata.official_product_url = _optional_text(
+                row.get("official_product_url")
+            )
+
+    if MARKET_OFFERS_PATH.exists():
+        offer_rows = pd.read_csv(MARKET_OFFERS_PATH)
+        for row in offer_rows.to_dict("records"):
+            perfume_id = int(row["perfume_id"])
+            if perfume_id not in perfume_ids:
+                continue
+
+            retailer = _optional_text(row.get("retailer"))
+            product_url = _optional_text(row.get("product_url"))
+            checked_at = _optional_datetime(row.get("checked_at"))
+            if retailer is None or product_url is None or checked_at is None:
+                continue
+
+            offer = (
+                db.query(PerfumeMarketOffer)
+                .filter(
+                    PerfumeMarketOffer.perfume_id == perfume_id,
+                    PerfumeMarketOffer.retailer == retailer,
+                    PerfumeMarketOffer.product_url == product_url,
+                )
+                .first()
+            )
+            if offer is None:
+                offer = PerfumeMarketOffer(
+                    perfume_id=perfume_id,
+                    retailer=retailer,
+                    product_url=product_url,
+                    checked_at=checked_at,
+                )
+                db.add(offer)
+                inserted_offers += 1
+
+            offer.price_krw = _optional_int(row.get("price_krw"))
+            offer.capacity_ml = _optional_int(row.get("capacity_ml"))
+            offer.checked_at = checked_at
+
+    db.commit()
+    return {"metadata": inserted_metadata, "offers": inserted_offers}
 
 
 def get_perfume_or_none(db: Session, perfume_id: int) -> dict | None:
@@ -241,11 +390,15 @@ def search_perfumes(
 
     if keyword:
         search_keyword = f"%{keyword.strip()}%"
+        localized_ids = _runtime_keyword_matches(keyword)
+        keyword_conditions = [
+            Perfume.name.ilike(search_keyword),
+            Perfume.brand.ilike(search_keyword),
+        ]
+        if localized_ids:
+            keyword_conditions.append(Perfume.perfume_id.in_(localized_ids))
         query = query.filter(
-            or_(
-                Perfume.name.ilike(search_keyword),
-                Perfume.brand.ilike(search_keyword),
-            )
+            or_(*keyword_conditions)
         )
 
     for category in normalized_categories:
@@ -258,6 +411,10 @@ def search_perfumes(
             for term in CATEGORY_KEYWORDS[category]
         ]
         query = query.filter(or_(*category_conditions))
+
+    # "신규 출시"는 실제 출시일이 검증되어 적재된 제품만 보여준다.
+    if sort == "latest":
+        query = query.filter(PerfumeMarketMetadata.released_at.is_not(None))
 
     total = query.order_by(None).count()
 
@@ -319,4 +476,18 @@ def get_popular_brands(db: Session, limit: int = 10) -> list[dict]:
         .all()
     )
 
-    return [{"brand": brand, "count": count} for brand, count in rows]
+    localized_brands = {}
+    for record in _runtime_catalog_records_by_id().values():
+        brand = str(record.get("Brand", "")).strip()
+        if brand and brand not in localized_brands:
+            localized_brands[brand] = _localized_value(record, "Brand KR", brand)
+
+    return [
+        {
+            "brand": brand,
+            "brand_ko": localized_brands.get(brand, brand),
+            "display_brand": localized_brands.get(brand, brand),
+            "count": count,
+        }
+        for brand, count in rows
+    ]

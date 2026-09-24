@@ -6,14 +6,35 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-from app.services.note_normalizer import normalize_note_text, normalize_note_token
+from app.services.note_normalizer import (
+    normalize_note_text,
+    normalize_note_token,
+    translate_notes_to_korean,
+)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 DATA_PATH = DATA_DIR / "perfumes.csv"
 KOREAN_MARKET_DATA_PATH = DATA_DIR / "korean_market_perfumes.csv"
+KOREAN_MARKET_CANDIDATES_PATH = DATA_DIR / "korean_market_perfumes_candidates.csv"
 DESCRIPTION_KO_PATH = DATA_DIR / "perfume_descriptions_ko.csv"
 MAX_AUTO_KEYWORDS_PER_CATEGORY = 80
+
+
+BRAND_KO_ALIASES = {
+    "BYREDO": "바이레도",
+    "CHANEL": "샤넬",
+    "Dior": "디올",
+    "Diptyque": "딥티크",
+    "Jo Malone London": "조 말론 런던",
+    "Le Labo": "르 라보",
+    "Maison Margiela": "메종 마르지엘라",
+    "NONFICTION": "논픽션",
+    "SW19": "SW19",
+    "TAMBURINS": "탬버린즈",
+    "HETRAS": "헤트라스",
+    "Yves Saint Laurent": "입생로랑",
+}
 
 
 CATEGORY_KEYWORDS = {
@@ -142,6 +163,40 @@ def build_auto_category_keywords(df):
     return auto_keywords
 
 
+def _product_alias_key(value: object) -> str:
+    normalized = normalize_note_text(value)
+    normalized = re.sub(
+        r"\b(eau de parfum|eau de toilette|eau de cologne|perfume oil|perfume|cologne)\b",
+        " ",
+        normalized,
+    )
+    return re.sub(r"[^0-9a-z가-힣]", "", normalized)
+
+
+def _apply_korean_catalog_aliases(df: pd.DataFrame) -> pd.DataFrame:
+    """Attach Korean display names to source rows already present in the catalog."""
+    df["Brand KR"] = df["Brand"].map(BRAND_KO_ALIASES).fillna(df["Brand KR"])
+
+    if not KOREAN_MARKET_CANDIDATES_PATH.exists():
+        return df
+
+    candidates = pd.read_csv(KOREAN_MARKET_CANDIDATES_PATH, encoding="utf-8")
+    for candidate in candidates.to_dict("records"):
+        brand = str(candidate.get("brand", "")).casefold()
+        product_key = _product_alias_key(candidate.get("product_name", ""))
+        name_ko = str(candidate.get("product_name_ko", "")).strip()
+        if not brand or not product_key or not name_ko:
+            continue
+
+        matching_rows = (
+            df["Brand"].astype(str).str.casefold().eq(brand)
+            & df["Name"].map(_product_alias_key).eq(product_key)
+        )
+        df.loc[matching_rows, "Name KR"] = name_ko
+
+    return df
+
+
 def load_perfume_data():
     base_df = pd.read_csv(DATA_PATH, encoding="latin1")
 
@@ -160,6 +215,9 @@ def load_perfume_data():
     base_df["catalog_key"] = "luckyscent:" + base_df["perfume_id"].astype(str)
     base_df["catalog_source"] = "kaggle_luckyscent"
     base_df["Description KR"] = ""
+    base_df["Name KR"] = ""
+    base_df["Brand KR"] = ""
+    base_df["Notes KR"] = base_df["Notes"].map(translate_notes_to_korean)
 
     catalog_frames = [base_df]
     if KOREAN_MARKET_DATA_PATH.exists():
@@ -188,7 +246,18 @@ def load_perfume_data():
         korean_df["catalog_source"] = korean_df.get("Source", "official").fillna(
             "official"
         )
-        korean_df["Description KR"] = korean_df.get("Summary KR", "").fillna("")
+        korean_df["Description KR"] = korean_df.get(
+            "Summary KR", pd.Series("", index=korean_df.index)
+        ).fillna("")
+        korean_df["Name KR"] = korean_df.get(
+            "Name KR", pd.Series("", index=korean_df.index)
+        ).fillna("")
+        korean_df["Brand KR"] = korean_df.get(
+            "Brand KR", pd.Series("", index=korean_df.index)
+        ).fillna("")
+        korean_df["Notes KR"] = korean_df.get(
+            "Notes KR", pd.Series("", index=korean_df.index)
+        ).fillna("")
         catalog_frames.append(korean_df)
 
     # Different product catalogs are unioned vertically.  Localized description
@@ -207,6 +276,12 @@ def load_perfume_data():
             )
             df["Description KR"] = df["description_ko"].fillna(df["Description KR"])
             df = df.drop(columns=["description_ko"])
+
+    df = _apply_korean_catalog_aliases(df)
+    missing_notes_ko = df["Notes KR"].fillna("").astype(str).str.strip().eq("")
+    df.loc[missing_notes_ko, "Notes KR"] = df.loc[
+        missing_notes_ko, "Notes"
+    ].map(translate_notes_to_korean)
 
     # Display text remains intact.  Only comparison text is normalized.
     df["notes_text"] = df["Notes"].map(normalize_note_text)

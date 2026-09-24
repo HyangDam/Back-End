@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from app.services.note_normalizer import normalize_note_token
+from app.services.note_normalizer import get_note_label_ko, normalize_note_token
 
 
 ACCORD_DEFINITIONS = {
@@ -110,10 +110,11 @@ def _split_notes(notes: str) -> list[dict]:
         if not canonical_note:
             continue
 
-        label_ko, label_en = NOTE_LABELS.get(
+        default_label_ko, label_en = NOTE_LABELS.get(
             canonical_note,
             (raw_note, raw_note),
         )
+        label_ko = get_note_label_ko(canonical_note, default_label_ko)
         icon_key = re.sub(r"[^a-z0-9]+", "-", canonical_note).strip("-")
         parsed_notes.append(
             {

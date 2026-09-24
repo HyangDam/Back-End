@@ -5,8 +5,11 @@ comparison representation so Korean/English aliases and letter case do not
 split one scent note into multiple tokens.
 """
 
+import csv
 import re
 import unicodedata
+from functools import lru_cache
+from pathlib import Path
 
 
 # Keep this focused on note names and common spelling variants.  Broad terms
@@ -71,6 +74,24 @@ NOTE_ALIASES = {
     "white musk": "musk",
 }
 
+NOTE_TRANSLATIONS_PATH = (
+    Path(__file__).resolve().parents[1] / "data" / "note_translations_ko.csv"
+)
+
+
+@lru_cache(maxsize=1)
+def get_note_translations_ko() -> dict[str, str]:
+    """Load translated canonical note names created by the batch script."""
+    if not NOTE_TRANSLATIONS_PATH.exists():
+        return {}
+
+    with NOTE_TRANSLATIONS_PATH.open("r", encoding="utf-8", newline="") as file:
+        return {
+            row["canonical_note"].strip(): row["note_ko"].strip()
+            for row in csv.DictReader(file)
+            if row.get("canonical_note") and row.get("note_ko")
+        }
+
 
 def normalize_note_text(value: object) -> str:
     """Return a case-insensitive, alias-normalized text for recommendation."""
@@ -96,3 +117,20 @@ def normalize_note_token(value: object) -> str:
         if marker in normalized:
             normalized = normalized.split(marker)[0]
     return " ".join(normalized.split()).strip(" .:-")
+
+
+def get_note_label_ko(canonical_note: str, fallback: str) -> str:
+    """Return a Korean display label while preserving unknown source notes."""
+    return get_note_translations_ko().get(canonical_note, fallback)
+
+
+def translate_notes_to_korean(notes: object) -> str:
+    """Translate a comma-separated Notes value using the shared note dictionary."""
+    translated_notes = []
+    for raw_note in re.split(r"[,;]", str(notes or "")):
+        raw_note = raw_note.strip()
+        canonical_note = normalize_note_token(raw_note)
+        if not canonical_note:
+            continue
+        translated_notes.append(get_note_label_ko(canonical_note, raw_note))
+    return ", ".join(translated_notes)

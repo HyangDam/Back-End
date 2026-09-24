@@ -22,7 +22,7 @@ from app.services.recommender import AVOID_KEYWORDS, CATEGORY_KEYWORDS, PerfumeR
 from app.routers import perfumes
 from app.models import perfume_interaction
 from app.routers import perfume_interactions
-from app.services.perfume_catalog import seed_perfumes_from_csv
+from app.services.perfume_catalog import seed_market_data_from_csv, seed_perfumes_from_csv
 from app.services.demo_data import seed_demo_reviews
 
 app = FastAPI(
@@ -35,6 +35,7 @@ Base.metadata.create_all(bind=engine)
 
 with SessionLocal() as db:
     seed_perfumes_from_csv(db)
+    seed_market_data_from_csv(db)
     if os.getenv("SEED_DEMO_DATA", "false").lower() == "true":
         seed_demo_reviews(db)
 
@@ -50,6 +51,7 @@ app.add_middleware(
         "http://localhost:3000",
         "http://localhost:5173",
         "https://front-end-psi-ashen.vercel.app",
+        "https://hyangdam.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -114,6 +116,14 @@ CATEGORY_GROUPS: dict[str, list[dict[str, Any]]] = {
 }
 
 
+def _row_display_value(row, field: str, fallback: str) -> str:
+    value = row.get(field)
+    if value is None or value != value:
+        return fallback
+    text = str(value).strip()
+    return text or fallback
+
+
 def perfume_results_to_response(results):
     return [
         {
@@ -121,10 +131,19 @@ def perfume_results_to_response(results):
             "perfume_id": int(row["perfume_id"]),
             "name": row["Name"],
             "brand": row["Brand"],
+            "name_ko": _row_display_value(row, "Name KR", row["Name"]),
+            "brand_ko": _row_display_value(row, "Brand KR", row["Brand"]),
             "score": round(float(row["score"]), 4),
             "notes": row["Notes"],
+            "notes_ko": _row_display_value(row, "Notes KR", row["Notes"]),
             "description": row["Description"],
             "description_ko": row["Description KR"],
+            "display_name": _row_display_value(row, "Name KR", row["Name"]),
+            "display_brand": _row_display_value(row, "Brand KR", row["Brand"]),
+            "display_notes": _row_display_value(row, "Notes KR", row["Notes"]),
+            "display_description": _row_display_value(
+                row, "Description KR", row["Description"]
+            ),
             "image_url": row["Image URL"],
         }
         for rank, (_, row) in enumerate(results.iterrows(), start=1)

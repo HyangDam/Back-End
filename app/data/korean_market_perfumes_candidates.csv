@@ -9,16 +9,16 @@ priority,market_group,brand,product_name,product_name_ko,official_site,collectio
 8,korean_brand,NONFICTION,YOUNG MEMORIES Eau de Parfum,영 메모리즈,https://nonfiction.com/,catalog_added,그린 프레시 수요 보강용 제품
 9,korean_brand,NONFICTION,THE BEIGE Eau de Parfum,더 베이지,https://nonfiction.com/,catalog_added,머스크 파우더리 수요 보강용 제품
 10,korean_brand,NONFICTION,THE GREY Eau de Parfum,더 그레이,https://nonfiction.com/,catalog_added,다크 머스크 수요 보강용 제품
-11,korean_brand,TAMBURINS,CHAMO Perfume,카모 퍼퓸,https://www.tamburins.com/,ready_to_collect,국내 인지도 높은 브랜드의 대표 향수 후보
-12,korean_brand,TAMBURINS,HOLY METAL Perfume,홀리 메탈 퍼퓸,https://www.tamburins.com/,ready_to_collect,국내 인지도 높은 브랜드의 대표 향수 후보
-13,korean_brand,TAMBURINS,LALE Perfume,랄레 퍼퓸,https://www.tamburins.com/,ready_to_collect,플로럴 계열 후보
-14,korean_brand,TAMBURINS,BERGA SANDAL Perfume,베르가 샌달 퍼퓸,https://www.tamburins.com/,ready_to_collect,시트러스 우디 계열 후보
-15,korean_brand,TAMBURINS,LATE AUTUMN Perfume,레이트 어텀 퍼퓸,https://www.tamburins.com/,ready_to_collect,따뜻한 계절성 향수 후보
-16,korean_brand,SW19,6 Eau de Parfum,SW19 6,https://sw19official.com/,ready_to_collect,국내 향수 브랜드 대표 제품 후보
-17,korean_brand,SW19,9 Eau de Parfum,SW19 9,https://sw19official.com/,ready_to_collect,국내 향수 브랜드 대표 제품 후보
-18,korean_brand,SW19,Midnight Eau de Parfum,SW19 미드나잇,https://sw19official.com/,ready_to_collect,국내 향수 브랜드 대표 제품 후보
-19,korean_brand,SW19,3 Eau de Parfum,SW19 3,https://sw19official.com/,ready_to_collect,국내 향수 브랜드 대표 제품 후보
-20,korean_brand,SW19,8 Eau de Parfum,SW19 8,https://sw19official.com/,ready_to_collect,국내 향수 브랜드 대표 제품 후보
+11,korean_brand,TAMBURINS,CHAMO Perfume,카모 퍼퓸,https://www.tamburins.com/kr/shop/perfume/perfumes/,catalog_added,공식 향노트 확인 제품
+12,korean_brand,TAMBURINS,BERGA SANDAL Perfume,버가샌달 퍼퓸,https://www.tamburins.com/kr/shop/perfume/perfumes/,catalog_added,공식 향노트 확인 제품
+13,korean_brand,TAMBURINS,LALE Perfume,라레 퍼퓸,https://www.tamburins.com/kr/shop/perfume/perfumes/,catalog_added,공식 향노트 확인 제품
+14,korean_brand,TAMBURINS,WHITE DARJEELING Perfume,화이트 다즐링 퍼퓸,https://www.tamburins.com/kr/shop/perfume/perfumes/,catalog_added,공식 향노트 확인 제품
+15,korean_brand,TAMBURINS,BLUE HINOKI Perfume,블루 히노키 퍼퓸,https://www.tamburins.com/kr/shop/perfume/perfumes/,catalog_added,공식 향노트 확인 제품
+16,korean_brand,SW19,6am Eau de Parfum,SW19 6am 오 드 퍼퓸,https://sw19official.com/product/6am-eau-de-parfum-50ml/13/,catalog_added,공식 향노트 확인 제품
+17,korean_brand,SW19,9pm Eau de Parfum,SW19 9pm 오 드 퍼퓸,https://sw19official.com/product/9pm-eau-de-parfum-50ml/15/,catalog_added,공식 향노트 확인 제품
+18,korean_brand,SW19,Midnight Eau de Parfum,SW19 미드나잇 오 드 퍼퓸,https://sw19official.com/product/midnight-eau-de-parfum-50ml/12/,catalog_added,공식 향노트 확인 제품
+19,korean_brand,SW19,3pm Eau de Parfum,SW19 3pm 오 드 퍼퓸,https://sw19official.com/product/sw19-3pm-eau-de-parfum-50ml/14/,catalog_added,공식 향노트 확인 제품
+20,korean_brand,SW19,8am Eau de Parfum,SW19 8am 오 드 퍼퓸,https://en.sw19official.com/product/8am-eau-de-parfum-50ml/200/category/121/display/1/,catalog_added,공식 향노트 확인 제품
 21,korean_market_global,Dior,Miss Dior Eau de Parfum,미스 디올 오 드 퍼퓸,https://www.dior.com/ko_kr/beauty,ready_to_collect,한국에서 익숙한 플로럴 대표 제품
 22,korean_market_global,Dior,J'adore Eau de Parfum,쟈도르 오 드 퍼퓸,https://www.dior.com/ko_kr/beauty,ready_to_collect,한국에서 익숙한 플로럴 대표 제품
 23,korean_market_global,Dior,Sauvage Eau de Toilette,소바쥬 오 드 뚜왈렛,https://www.dior.com/ko_kr/beauty,ready_to_collect,남성 및 공용 추천 보강용 제품
@@ -39,3 +39,12 @@ priority,market_group,brand,product_name,product_name_ko,official_site,collectio
 38,korean_market_global,Maison Margiela,REPLICA By the Fireplace,바이 더 파이어플레이스,https://www.maisonmargiela-fragrances.eu/,ready_to_collect,겨울 포근함 수요 보강용 제품
 39,korean_market_global,CHANEL,CHANCE EAU TENDRE Eau de Parfum,샹스 오 땅드르 오 드 퍼퓸,https://www.chanel.com/kr/,ready_to_collect,프루티 플로럴 수요 보강용 제품
 40,korean_market_global,CHANEL,COCO MADEMOISELLE Eau de Parfum,코코 마드모아젤 오 드 퍼퓸,https://www.chanel.com/kr/,ready_to_collect,우아한 시트러스 플로럴 제품
+41,korean_market_global,Yves Saint Laurent,Libre Eau de Parfum,리브르 오 드 빠르펭,https://www.yslbeautykr.com/,catalog_added,국내 인지도 높은 플로럴 라벤더 향수
+42,korean_market_global,Yves Saint Laurent,Black Opium Eau de Parfum,블랙 오피움 오 드 빠르펭,https://www.yslbeautykr.com/,catalog_added,국내 인지도 높은 커피 바닐라 구르망 향수
+43,korean_brand,HETRAS,Handmade Perfume Flirting,헤트라스 플러팅,https://www.hetras.co.kr/,catalog_added,공식 향노트 확인 제품
+44,korean_brand,HETRAS,Handmade Perfume Bombshell Floral,헤트라스 밤쉘 플로럴,https://www.hetras.co.kr/,catalog_added,공식 향노트 확인 제품
+45,korean_brand,HETRAS,Handmade Perfume Good Daisy,헤트라스 굿 데이지,https://www.hetras.co.kr/,catalog_added,공식 향노트 확인 제품
+46,korean_brand,HETRAS,Handmade Perfume Robe White,헤트라스 로브 화이트,https://www.hetras.co.kr/,catalog_added,공식 향노트 확인 제품
+47,korean_brand,HETRAS,Handmade Perfume The Ribbon,헤트라스 더 리본,https://www.hetras.co.kr/,catalog_added,공식 향노트 확인 제품
+48,korean_brand,HETRAS,Handmade Perfume Royal Wood,헤트라스 로열 우드,https://www.hetras.co.kr/,catalog_added,공식 향노트 확인 제품
+49,korean_brand,HETRAS,Handmade Perfume Boutique Cotton,헤트라스 부티크 코튼,https://www.hetras.co.kr/,catalog_added,공식 향노트 확인 제품
