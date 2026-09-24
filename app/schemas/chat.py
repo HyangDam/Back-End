@@ -1,6 +1,7 @@
 import re
 
 from pydantic import BaseModel, Field, field_validator
+from pydantic_core import PydanticCustomError
 
 
 CASUAL_ONLY_MESSAGES = {
@@ -43,9 +44,10 @@ class ChatRecommendationRequest(BaseModel):
         if compact_message in CASUAL_ONLY_MESSAGES or not PREFERENCE_HINT_PATTERN.search(
             message
         ):
-            raise ValueError(
-                "향수 또는 원하는 향의 분위기를 포함해 입력해주세요. "
-                "예: 중요한 자리에 어울리는 은은하고 깨끗한 향을 추천해줘"
+            raise PydanticCustomError(
+                "invalid_recommendation_message",
+                "유효한 문장을 입력해주세요. "
+                "예시 문장: 중요한 자리에 어울리는 은은하고 깨끗한 향을 추천해줘"
             )
 
         return message
