@@ -8,6 +8,7 @@ from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 bearer_scheme = HTTPBearer()
+optional_bearer_scheme = HTTPBearer(auto_error=False)
 
 JWT_SECRET_KEY = os.getenv(
     "JWT_SECRET_KEY",
@@ -63,4 +64,22 @@ def get_current_user_id(
     if user_id is None:
         raise HTTPException(status_code=401, detail="Invalid access token.")
 
+    return int(user_id)
+
+
+def get_optional_current_user_id(
+    credentials: HTTPAuthorizationCredentials | None = Depends(optional_bearer_scheme),
+) -> int | None:
+    """Return the authenticated user ID when a bearer token is supplied.
+
+    Perfume detail is publicly visible, but its ownership and like flags are
+    personalized for a signed-in viewer.
+    """
+    if credentials is None:
+        return None
+
+    payload = decode_access_token(credentials.credentials)
+    user_id = payload.get("sub")
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Invalid access token.")
     return int(user_id)

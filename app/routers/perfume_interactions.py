@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.core.security import get_current_user_id
+from app.core.security import get_current_user_id, get_optional_current_user_id
 from app.database import get_db
 from app.models.perfume_interaction import Like, PerfumeReview, UserPerfume
 from app.schemas.perfume_interaction import (
@@ -44,6 +44,26 @@ def get_review_count(db: Session, perfume_id: int) -> int:
     ).scalar()
 
 
+def get_user_interaction_flags(
+    db: Session,
+    user_id: int | None,
+    perfume_id: int,
+) -> dict[str, bool]:
+    if user_id is None:
+        return {"is_owned": False, "is_liked": False}
+
+    is_owned = db.query(UserPerfume.id).filter(
+        UserPerfume.user_id == user_id,
+        UserPerfume.perfume_id == perfume_id,
+        UserPerfume.status == "owned",
+    ).first() is not None
+    is_liked = db.query(Like.id).filter(
+        Like.user_id == user_id,
+        Like.perfume_id == perfume_id,
+    ).first() is not None
+    return {"is_owned": is_owned, "is_liked": is_liked}
+
+
 def review_to_response(db: Session, review: PerfumeReview):
     return {
         "review_id": review.review_id,
@@ -60,6 +80,7 @@ def review_to_response(db: Session, review: PerfumeReview):
 @router.get("/perfumes/{perfume_id}")
 def get_perfume_detail(
     perfume_id: int,
+    current_user_id: int | None = Depends(get_optional_current_user_id),
     db: Session = Depends(get_db),
 ):
     perfume = get_perfume_or_404(db, perfume_id)
@@ -69,6 +90,7 @@ def get_perfume_detail(
         "like_count": get_like_count(db, perfume_id),
         "owned_count": get_owned_count(db, perfume_id),
         "review_count": get_review_count(db, perfume_id),
+        **get_user_interaction_flags(db, current_user_id, perfume_id),
     }
 
 
@@ -141,17 +163,27 @@ def get_my_liked_perfumes(
         Like.user_id == current_user_id,
     ).order_by(Like.created_at.desc()).all()
 
-    return {
-        "user_id": current_user_id,
-        "results": [
+    results = []
+    for like in likes:
+        perfume = get_perfume_or_none(db, like.perfume_id)
+        results.append(
             {
                 "id": like.id,
                 "perfume_id": like.perfume_id,
-                "perfume": get_perfume_or_none(db, like.perfume_id),
+                "perfume": perfume,
+                # Nested perfume remains the canonical object. Flat display
+                # fields make card rendering resilient to older FE adapters.
+                "name": perfume["display_name"] if perfume else None,
+                "brand": perfume["display_brand"] if perfume else None,
+                "notes": perfume["display_notes"] if perfume else None,
+                "image_url": perfume["image_url"] if perfume else None,
                 "created_at": like.created_at,
             }
-            for like in likes
-        ],
+        )
+
+    return {
+        "user_id": current_user_id,
+        "results": results,
     }
 
 
@@ -169,6 +201,12 @@ def add_my_perfume(
     ).first()
 
     if existing_perfume:
+        # A user may move a previously saved wishlist item into their shelf.
+        # Keep the single user/perfume row and update its status accordingly.
+        if existing_perfume.status != request.status:
+            existing_perfume.status = request.status
+            db.commit()
+            db.refresh(existing_perfume)
         return {
             **existing_perfume.__dict__,
             "perfume": perfume,
