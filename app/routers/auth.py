@@ -18,6 +18,7 @@ from app.core.security import (
 )
 from app.database import get_db
 from app.models.auth import RefreshToken, SocialAccount
+from app.models.onboarding import UserOnboarding
 from app.models.user import User, UserStatus
 from app.schemas.auth import (
     LogoutRequest,
@@ -203,10 +204,14 @@ def build_token_response(
     access_token: str,
     refresh_token: str,
     is_new_user: bool,
+    db: Session,
 ) -> dict:
     profile_required = not bool(
         user.name and user.nickname and user.gender and user.birth_date
     )
+    onboarding_completed = db.query(UserOnboarding.onboarding_id).filter(
+        UserOnboarding.user_id == user.user_id
+    ).first() is not None
 
     return {
         "access_token": access_token,
@@ -216,6 +221,7 @@ def build_token_response(
         "email": user.email,
         "is_new_user": is_new_user,
         "profile_required": profile_required,
+        "onboarding_completed": onboarding_completed,
         "user": {
             "user_id": user.user_id,
             "email": user.email,
@@ -339,7 +345,7 @@ def social_login(
 
     access_token, refresh_token = issue_tokens(user.user_id, db)
 
-    return build_token_response(user, access_token, refresh_token, is_new_user)
+    return build_token_response(user, access_token, refresh_token, is_new_user, db)
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -373,7 +379,7 @@ def refresh_access_token(
     db_refresh_token.revoked_at = datetime.utcnow()
     db.commit()
 
-    return build_token_response(user, access_token, new_refresh_token, False)
+    return build_token_response(user, access_token, new_refresh_token, False, db)
 
 
 @router.post("/logout", response_model=MessageResponse)

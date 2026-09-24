@@ -28,6 +28,7 @@ class TokenResponse(BaseModel):
     email: str | None
     is_new_user: bool
     profile_required: bool
+    onboarding_completed: bool
     user: AuthUserResponse
 
 
