@@ -50,7 +50,12 @@ def get_user_interaction_flags(
     perfume_id: int,
 ) -> dict[str, bool]:
     if user_id is None:
-        return {"is_owned": False, "is_liked": False}
+        return {
+            "is_owned": False,
+            "is_liked": False,
+            "has_my_review": False,
+            "can_write_review": False,
+        }
 
     is_owned = db.query(UserPerfume.id).filter(
         UserPerfume.user_id == user_id,
@@ -61,7 +66,17 @@ def get_user_interaction_flags(
         Like.user_id == user_id,
         Like.perfume_id == perfume_id,
     ).first() is not None
-    return {"is_owned": is_owned, "is_liked": is_liked}
+    has_my_review = db.query(PerfumeReview.review_id).filter(
+        PerfumeReview.user_id == user_id,
+        PerfumeReview.perfume_id == perfume_id,
+    ).first() is not None
+
+    return {
+        "is_owned": is_owned,
+        "is_liked": is_liked,
+        "has_my_review": has_my_review,
+        "can_write_review": is_owned and not has_my_review,
+    }
 
 
 def review_to_response(db: Session, review: PerfumeReview):
