@@ -127,16 +127,35 @@ def get_kakao_profile(code: str, redirect_uri: str) -> dict:
     )
     kakao_account = user_response.get("kakao_account") or {}
     profile = kakao_account.get("profile") or {}
+    # Kakao may return profile values under kakao_account.profile or the
+    # legacy-compatible top-level properties object depending on app settings.
+    properties = user_response.get("properties") or {}
     email = kakao_account.get("email")
+    nickname = profile.get("nickname") or properties.get("nickname")
+    profile_image_url = (
+        profile.get("profile_image_url")
+        or properties.get("profile_image")
+        or profile.get("thumbnail_image_url")
+        or properties.get("thumbnail_image")
+    )
+
+    logger.info(
+        "Kakao user profile received "
+        "(account_profile_nickname=%s, properties_nickname=%s, "
+        "account_profile_image=%s, properties_profile_image=%s)",
+        bool(profile.get("nickname")),
+        bool(properties.get("nickname")),
+        bool(profile.get("profile_image_url") or profile.get("thumbnail_image_url")),
+        bool(properties.get("profile_image") or properties.get("thumbnail_image")),
+    )
 
     return {
         "provider": "kakao",
         "provider_user_id": str(user_response["id"]),
         "email": email,
         "name": kakao_account.get("name"),
-        "nickname": profile.get("nickname"),
-        "profile_image_url": profile.get("profile_image_url")
-        or profile.get("thumbnail_image_url"),
+        "nickname": nickname,
+        "profile_image_url": profile_image_url,
     }
 
 
