@@ -7,6 +7,7 @@ app/data/*.csv
 !app/data/korean_market_perfumes.csv
 !app/data/korean_market_perfumes_candidates.csv
 !app/data/perfume_descriptions_ko.csv
+!app/data/perfume_names_brands_ko.csv
 !app/data/note_translations_ko.csv
 !app/data/perfume_market_metadata.csv
 !app/data/perfume_market_offers.csv

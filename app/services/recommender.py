@@ -18,6 +18,7 @@ DATA_PATH = DATA_DIR / "perfumes.csv"
 KOREAN_MARKET_DATA_PATH = DATA_DIR / "korean_market_perfumes.csv"
 KOREAN_MARKET_CANDIDATES_PATH = DATA_DIR / "korean_market_perfumes_candidates.csv"
 DESCRIPTION_KO_PATH = DATA_DIR / "perfume_descriptions_ko.csv"
+NAME_BRAND_KO_PATH = DATA_DIR / "perfume_names_brands_ko.csv"
 MAX_AUTO_KEYWORDS_PER_CATEGORY = 80
 
 
@@ -197,6 +198,33 @@ def _apply_korean_catalog_aliases(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _merge_name_brand_translations(df: pd.DataFrame) -> pd.DataFrame:
+    """Attach generated Korean display names without changing source catalog text."""
+    if not NAME_BRAND_KO_PATH.exists():
+        return df
+
+    translations = pd.read_csv(NAME_BRAND_KO_PATH, encoding="utf-8")
+    expected_columns = {"catalog_key", "name_ko", "brand_ko"}
+    if not expected_columns.issubset(translations.columns):
+        return df
+
+    translations = translations[
+        ["catalog_key", "name_ko", "brand_ko"]
+    ].drop_duplicates(subset=["catalog_key"], keep="last")
+    df = df.merge(translations, on="catalog_key", how="left")
+
+    for source_column, translated_column in (
+        ("Name KR", "name_ko"),
+        ("Brand KR", "brand_ko"),
+    ):
+        has_translation = df[translated_column].fillna("").astype(str).str.strip().ne("")
+        df.loc[has_translation, source_column] = df.loc[
+            has_translation, translated_column
+        ]
+
+    return df.drop(columns=["name_ko", "brand_ko"])
+
+
 def load_perfume_data():
     base_df = pd.read_csv(DATA_PATH, encoding="latin1")
 
@@ -277,6 +305,7 @@ def load_perfume_data():
             df["Description KR"] = df["description_ko"].fillna(df["Description KR"])
             df = df.drop(columns=["description_ko"])
 
+    df = _merge_name_brand_translations(df)
     df = _apply_korean_catalog_aliases(df)
     missing_notes_ko = df["Notes KR"].fillna("").astype(str).str.strip().eq("")
     df.loc[missing_notes_ko, "Notes KR"] = df.loc[
