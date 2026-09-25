@@ -260,19 +260,25 @@ def get_perfume_or_none(db: Session, perfume_id: int) -> dict | None:
         db.query(
             Perfume,
             func.count(Like.id).label("like_count"),
+            func.max(PerfumeMarketMetadata.released_at).label("released_at"),
         )
         .outerjoin(Like, Like.perfume_id == Perfume.perfume_id)
+        .outerjoin(
+            PerfumeMarketMetadata,
+            PerfumeMarketMetadata.perfume_id == Perfume.perfume_id,
+        )
         .filter(Perfume.perfume_id == perfume_id)
         .group_by(Perfume.perfume_id)
         .first()
     )
     if row is None:
         return None
-    perfume, like_count = row
+    perfume, like_count, released_at = row
     return perfume_to_response(
         perfume,
         include_description=True,
         like_count=int(like_count),
+        released_at=released_at,
     )
 
 
