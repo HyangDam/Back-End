@@ -40,6 +40,26 @@ def get_runtime_catalog_record(perfume_id: int) -> dict | None:
     return _runtime_catalog_records_by_id().get(perfume_id)
 
 
+@lru_cache(maxsize=1)
+def _market_date_details_by_id() -> dict[int, dict[str, str]]:
+    """Keep audit-only date metadata out of the runtime database schema.
+
+    ``released_at`` is persisted for sorting, while the CSV retains whether the
+    date means a product launch or a documented domestic availability event.
+    """
+    if not MARKET_METADATA_PATH.exists():
+        return {}
+
+    details: dict[int, dict[str, str]] = {}
+    for row in pd.read_csv(MARKET_METADATA_PATH).to_dict("records"):
+        perfume_id = int(row["perfume_id"])
+        details[perfume_id] = {
+            "market_date_type": _optional_text(row.get("market_date_type")) or "launch",
+            "release_source_url": _optional_text(row.get("release_source_url")) or "",
+        }
+    return details
+
+
 def _localized_value(record: dict | None, field: str, fallback: str) -> str:
     if record is None:
         return fallback
@@ -110,6 +130,10 @@ def perfume_to_response(
         "category": categories[0] if categories else None,
         "categories": categories,
     }
+
+    market_date_details = _market_date_details_by_id().get(perfume.perfume_id)
+    if market_date_details:
+        result["market_date_type"] = market_date_details["market_date_type"]
 
     if weekly_like_count is not None:
         result["weekly_like_count"] = weekly_like_count
