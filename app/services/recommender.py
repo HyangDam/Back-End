@@ -412,10 +412,13 @@ class PerfumeRecommender:
                 "perfume_id",
                 "catalog_key",
                 "Name",
+                "Name KR",
                 "Brand",
+                "Brand KR",
                 "Description",
                 "Description KR",
                 "Notes",
+                "Notes KR",
                 "Image URL",
             ]
         ].copy()
