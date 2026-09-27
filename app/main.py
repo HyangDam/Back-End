@@ -148,7 +148,12 @@ def _row_display_value(row, field: str, fallback: str) -> str:
     return text or fallback
 
 
-def perfume_results_to_response(results):
+def perfume_results_to_response(
+    results,
+    selected_categories: list[str],
+    avoid_categories: list[str],
+    focus_categories: list[str],
+):
     return [
         {
             "rank": rank,
@@ -169,6 +174,12 @@ def perfume_results_to_response(results):
                 row, "Description KR", row["Description"]
             ),
             "image_url": row["Image URL"],
+            "recommendation_match": recommender.build_recommendation_match(
+                row,
+                selected_categories,
+                avoid_categories,
+                focus_categories,
+            ),
         }
         for rank, (_, row) in enumerate(results.iterrows(), start=1)
     ]
@@ -245,7 +256,12 @@ def recommend_perfumes(request: RecommendationRequest):
         "avoid_categories": request.avoid_categories,
         "focus_categories": request.focus_categories,
         "top_n": request.top_n,
-        "results": perfume_results_to_response(results),
+        "results": perfume_results_to_response(
+            results,
+            request.selected_categories,
+            request.avoid_categories,
+            request.focus_categories,
+        ),
     }
 
 
@@ -273,7 +289,12 @@ def recommend_perfumes_by_text(request: TextRecommendationRequest):
             "avoid_scores": extracted["avoid_scores"],
         },
         "top_n": request.top_n,
-        "results": perfume_results_to_response(results),
+        "results": perfume_results_to_response(
+            results,
+            selected_categories,
+            avoid_categories,
+            focus_categories,
+        ),
     }
 
 
@@ -307,5 +328,10 @@ def chat_recommend_perfumes(
             "focus_categories": analysis["focus_categories"],
         },
         "top_n": request.top_n,
-        "results": perfume_results_to_response(results),
+        "results": perfume_results_to_response(
+            results,
+            analysis["selected_categories"],
+            analysis["avoid_categories"],
+            analysis["focus_categories"],
+        ),
     }

@@ -38,6 +38,29 @@ BRAND_KO_ALIASES = {
 }
 
 
+CATEGORY_DISPLAY_LABELS = {
+    "date": "데이트/약속",
+    "school_work": "학교/출근",
+    "summer": "여름/산뜻함",
+    "winter": "겨울/포근함",
+    "clean": "깨끗한 느낌",
+    "sweet": "달달한 느낌",
+    "elegant": "우아한 느낌",
+    "floral": "플로럴",
+    "citrus": "시트러스",
+    "woody": "우디",
+    "musk": "머스크",
+    "oriental": "오리엔탈",
+    "aquatic": "아쿠아틱",
+    "green": "그린",
+    "spicy": "스파이시",
+    "powdery": "파우더리",
+    "gourmand": "구르망",
+    "fresh": "프레시",
+    "earthy": "어시",
+}
+
+
 CATEGORY_KEYWORDS = {
     "date": ["romantic", "sweet", "soft", "floral"],
     "school_work": ["clean", "fresh", "light", "subtle"],
@@ -350,6 +373,96 @@ class PerfumeRecommender:
         self.desc_matrix = self.desc_vectorizer.fit_transform(self.df["desc_text"])
         self.brand_matrix = self.brand_vectorizer.fit_transform(self.df["brand_text"])
 
+    def _matched_categories(
+        self,
+        text: str,
+        categories: list[str],
+        category_keywords: dict[str, list[str]],
+    ) -> list[str]:
+        matched_categories = []
+
+        for category in categories:
+            keywords = category_keywords.get(category, [])
+            if any(note_matches_seed(text, keyword) for keyword in keywords):
+                matched_categories.append(category)
+
+        return matched_categories
+
+    def build_recommendation_match(
+        self,
+        row: pd.Series,
+        selected_categories: list[str],
+        avoid_categories: list[str],
+        focus_categories: list[str],
+    ) -> dict:
+        """Create short, evidence-based copy for a recommendation card."""
+        product_text = f"{row['notes_text']} {row['desc_text']}"
+        selected_matches = self._matched_categories(
+            product_text,
+            selected_categories,
+            self.category_keywords,
+        )
+        focus_matches = self._matched_categories(
+            product_text,
+            focus_categories,
+            self.category_keywords,
+        )
+        avoid_matches = self._matched_categories(
+            product_text,
+            avoid_categories,
+            AVOID_KEYWORDS,
+        )
+        selected_coverage = len(selected_matches) / max(len(selected_categories), 1)
+        score_percentile = float(row["score_percentile"])
+
+        if avoid_matches:
+            level = "medium" if selected_matches else "low"
+        elif score_percentile >= 0.90 and selected_coverage >= 0.5:
+            level = "high"
+        elif selected_matches:
+            level = "medium"
+        else:
+            level = "low"
+
+        labels = lambda categories: [
+            CATEGORY_DISPLAY_LABELS.get(category, category) for category in categories
+        ]
+        reasons = []
+
+        if selected_matches:
+            reasons.append(
+                f"선호한 {', '.join(labels(selected_matches[:2]))} 조건과 잘 맞아요."
+            )
+        else:
+            reasons.append("입력한 취향과 가까운 노트와 설명을 기준으로 골랐어요.")
+
+        if focus_categories:
+            focus_labels = labels((focus_matches or focus_categories)[:2])
+            reasons.append(
+                f"중점으로 고른 {', '.join(focus_labels)} 조건을 함께 반영했어요."
+            )
+
+        if avoid_categories:
+            avoid_labels = ", ".join(labels(avoid_matches or avoid_categories)[:2])
+            if avoid_matches:
+                reasons.append(
+                    f"피하고 싶은 {avoid_labels} 계열이 일부 있어 점수를 낮춰 반영했어요."
+                )
+            else:
+                reasons.append(
+                    f"피하고 싶은 {avoid_labels} 계열의 노트는 두드러지지 않아요."
+                )
+
+        return {
+            "level": level,
+            "label": {
+                "high": "취향과 잘 맞아요",
+                "medium": "선호 조건을 일부 반영했어요",
+                "low": "새로운 취향으로 탐색해보세요",
+            }[level],
+            "reasons": reasons[:3],
+        }
+
     def recommend(
         self,
         selected_categories,
@@ -420,10 +533,15 @@ class PerfumeRecommender:
                 "Notes",
                 "Notes KR",
                 "Image URL",
+                "notes_text",
+                "desc_text",
             ]
         ].copy()
 
         results["score"] = final_score[top_indices]
+        results["score_percentile"] = [
+            float((final_score <= score).mean()) for score in final_score[top_indices]
+        ]
         return results
 
 
