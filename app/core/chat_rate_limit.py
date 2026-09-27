@@ -36,13 +36,13 @@ class ChatRateLimiter:
             if requests_in_last_minute >= self.per_minute:
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="Chat recommendation limit reached. Please try again in a minute.",
+                    detail="추천 요청이 너무 많아요. 1분 후에 다시 시도해주세요.",
                 )
 
             if len(requests) >= self.per_day:
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="Daily chat recommendation limit reached. Please try again tomorrow.",
+                    detail="오늘의 추천 요청 횟수를 모두 사용했어요. 내일 다시 시도해주세요.",
                 )
 
             requests.append(now)

@@ -2,7 +2,10 @@ from typing import Any
 import os
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from app.database import Base, SessionLocal, engine
@@ -30,6 +33,27 @@ app = FastAPI(
     description="HyangDam perfume recommendation backend",
     version="0.1.0",
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def handle_chat_validation_error(
+    request: Request,
+    exc: RequestValidationError,
+):
+    """Return a user-facing Korean message for chat request format errors."""
+    if request.url.path != "/api/v1/chat/recommend":
+        return JSONResponse(
+            status_code=422,
+            content={"detail": jsonable_encoder(exc.errors())},
+        )
+
+    errors = exc.errors()
+    message = "유효한 문장을 입력해주세요. 예시 문장: 중요한 자리에 어울리는 은은하고 깨끗한 향을 추천해줘"
+
+    if any(error.get("loc", [])[-1:] == ["top_n"] for error in errors):
+        message = "추천 개수는 1개부터 20개 사이로 입력해주세요."
+
+    return JSONResponse(status_code=422, content={"detail": message})
 
 Base.metadata.create_all(bind=engine)
 
