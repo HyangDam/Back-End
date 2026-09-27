@@ -153,7 +153,9 @@ def get_kakao_profile(code: str, redirect_uri: str) -> dict:
         "provider": "kakao",
         "provider_user_id": str(user_response["id"]),
         "email": email,
-        "name": kakao_account.get("name"),
+        # Kakao does not provide a verified real name. Use its profile nickname
+        # as the initial display name until the user completes their profile.
+        "name": nickname,
         "nickname": nickname,
         "profile_image_url": profile_image_url,
     }
@@ -251,7 +253,11 @@ def build_token_response(
     }
 
 
-def get_available_nickname(db: Session, candidate: str | None) -> str | None:
+def get_available_nickname(
+    db: Session,
+    candidate: str | None,
+    current_user_id: int | None = None,
+) -> str | None:
     if not candidate:
         return None
 
@@ -259,7 +265,11 @@ def get_available_nickname(db: Session, candidate: str | None) -> str | None:
     if not nickname:
         return None
 
-    exists = db.query(User.user_id).filter(User.nickname == nickname).first()
+    query = db.query(User.user_id).filter(User.nickname == nickname)
+    if current_user_id is not None:
+        query = query.filter(User.user_id != current_user_id)
+
+    exists = query.first()
     return None if exists else nickname
 
 
@@ -276,7 +286,11 @@ def fill_missing_social_profile(
         updated = True
 
     if not user.nickname:
-        nickname = get_available_nickname(db, social_profile.get("nickname"))
+        nickname = get_available_nickname(
+            db,
+            social_profile.get("nickname"),
+            current_user_id=user.user_id,
+        )
         if nickname:
             user.nickname = nickname
             updated = True
@@ -344,7 +358,7 @@ def social_login(
                 # Collect recommendation-related profile data after social login.
                 name=social_profile.get("name"),
                 nickname=get_available_nickname(db, social_profile.get("nickname")),
-                profile_image_url=social_profile["profile_image_url"],
+                profile_image_url=social_profile.get("profile_image_url"),
                 status=UserStatus.active,
             )
             db.add(user)
