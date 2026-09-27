@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
+import re
 
 import pandas as pd
 from sqlalchemy import case, func, or_
@@ -70,18 +71,23 @@ def _localized_value(record: dict | None, field: str, fallback: str) -> str:
     return text or fallback
 
 
+def _normalize_search_text(value: object) -> str:
+    """Compare names without making users reproduce spaces or punctuation."""
+    return re.sub(r"[\W_]+", "", str(value).casefold())
+
+
 @lru_cache(maxsize=256)
 def _runtime_keyword_matches(keyword: str) -> list[int]:
-    """Find catalog IDs by Korean product, brand, or note labels kept in CSV."""
-    normalized_keyword = keyword.strip().casefold()
+    """Find catalog IDs by normalized product and brand names kept in CSV."""
+    normalized_keyword = _normalize_search_text(keyword)
     if not normalized_keyword:
         return []
 
-    searchable_columns = ["Name KR", "Brand KR", "Notes KR", "Summary KR"]
+    searchable_columns = ["Name", "Brand", "Name KR", "Brand KR"]
     matches = []
     for perfume_id, record in _runtime_catalog_records_by_id().items():
         if any(
-            normalized_keyword in str(record.get(column, "")).casefold()
+            normalized_keyword in _normalize_search_text(record.get(column, ""))
             for column in searchable_columns
         ):
             matches.append(perfume_id)
