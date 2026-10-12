@@ -10,44 +10,37 @@ from app.services.recommender import AVOID_KEYWORDS, CATEGORY_KEYWORDS
 logger = logging.getLogger(__name__)
 
 
-CATEGORY_LABELS = {
-    "clean": "깨끗하고 부담 없는 느낌",
-    "sweet": "달콤하고 포근한 느낌",
-    "elegant": "차분하고 격식 있는 느낌",
-    "floral": "꽃향 계열",
-    "citrus": "상큼한 시트러스 계열",
-    "woody": "차분한 나무 향 계열",
-    "spicy": "자극적인 향신료 계열",
-    "musk": "머스크 계열",
-    "powdery": "파우더리 계열",
-    "gourmand": "디저트 같은 구르망 계열",
-    "aquatic": "시원한 아쿠아틱 계열",
-    "green": "싱그러운 그린 계열",
-    "fresh": "상쾌한 프레시 계열",
-    "oriental": "따뜻한 오리엔탈 계열",
-    "earthy": "흙내음의 어시 계열",
-    "date": "데이트/약속 상황",
-    "school_work": "학교/출근 상황",
-    "summer": "여름처럼 산뜻한 분위기",
-    "winter": "겨울처럼 포근한 분위기",
+CATEGORY_RECOMMENDATION_PHRASES = {
+    "clean": "깨끗하고 부담 없는",
+    "sweet": "달콤하고 포근한",
+    "elegant": "차분하고 우아한",
+    "floral": "꽃향이 돋보이는",
+    "citrus": "상큼한 시트러스",
+    "woody": "차분한 우디",
+    "spicy": "개성 있는 스파이시",
+    "musk": "부드러운 머스크",
+    "powdery": "포근한 파우더리",
+    "gourmand": "달콤한 구르망",
+    "aquatic": "시원한 아쿠아틱",
+    "green": "싱그러운 그린",
+    "fresh": "가볍고 프레시한",
+    "oriental": "따뜻한 오리엔탈",
+    "earthy": "깊이 있는 어시",
+    "date": "데이트에 어울리는",
+    "school_work": "학교나 출근길에 부담 없는",
+    "summer": "여름에 어울리는 산뜻한",
+    "winter": "겨울에 어울리는 포근한",
 }
 
 
-def _build_assistant_message(selected_categories, avoid_categories, summary=None):
-    if summary:
-        return str(summary).strip()[:220]
-
-    selected_labels = [
-        CATEGORY_LABELS.get(category, category) for category in selected_categories[:2]
-    ]
-    avoid_labels = [
-        CATEGORY_LABELS.get(category, category) for category in avoid_categories[:2]
-    ]
-
-    assistant_message = f"{', '.join(selected_labels)}을 중심으로 추천했어요."
-    if avoid_labels:
-        assistant_message += f" {'; '.join(avoid_labels)}은 추천 점수에서 낮췄어요."
-    return assistant_message
+def _build_assistant_message(selected_categories, focus_categories):
+    """Keep the chat card headline short and consistent across analyzers."""
+    primary_category = (focus_categories or selected_categories or ["clean"])[0]
+    phrase = CATEGORY_RECOMMENDATION_PHRASES.get(
+        primary_category,
+        "입력하신 취향에 어울리는",
+    )
+    return f"{phrase} 향수를 추천했어요."
 
 
 def _rule_tfidf_analysis(message: str, analysis_source="rule_tfidf") -> dict:
@@ -64,7 +57,7 @@ def _rule_tfidf_analysis(message: str, analysis_source="rule_tfidf") -> dict:
         "selected_scores": extracted["selected_scores"],
         "avoid_scores": extracted["avoid_scores"],
         "assistant_message": _build_assistant_message(
-            selected_categories, avoid_categories
+            selected_categories, focus_categories
         ),
     }
 
@@ -90,13 +83,11 @@ LLM_RESPONSE_SCHEMA = {
             "items": {"type": "string", "enum": SELECTED_CATEGORY_IDS},
             "maxItems": 2,
         },
-        "preference_summary": {"type": "string", "maxLength": 220},
     },
     "required": [
         "selected_categories",
         "avoid_categories",
         "focus_categories",
-        "preference_summary",
     ],
     "additionalProperties": False,
 }
@@ -104,8 +95,7 @@ LLM_RESPONSE_SCHEMA = {
 SYSTEM_INSTRUCTIONS = """
 You are a Korean perfume-preference analyzer for HyangDam.
 Extract the user's intent into only the supplied category IDs.
-Do not recommend a product, invent a category, claim that a scent is certain,
-or write more than one short Korean sentence in preference_summary.
+Do not recommend a product, invent a category, or claim that a scent is certain.
 Treat clearly negative expressions such as '피하고 싶다', '싫다', '부담스럽다'
 as avoid_categories. Choose clean when the user wants an unobtrusive first perfume.
 focus_categories must contain the one or two most important positive categories.
@@ -152,8 +142,7 @@ def _llm_analysis(message: str) -> dict:
         "avoid_scores": {},
         "assistant_message": _build_assistant_message(
             selected_categories,
-            avoid_categories,
-            parsed.get("preference_summary"),
+            focus_categories or selected_categories[:1],
         ),
     }
 
