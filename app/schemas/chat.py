@@ -22,15 +22,6 @@ CASUAL_ONLY_MESSAGES = {
     "웅",
 }
 
-PREFERENCE_HINT_PATTERN = re.compile(
-    r"향수|향기|향조|향을|향이|향은|향에|향과|노트|추천|좋아|싫어|피하|부담|강하|은은|가볍|진하|"
-    r"달콤|달달|깨끗|깔끔|무난|상쾌|청량|시원|포근|차분|우아|격식|데이트|출근|학교|면접|취업|취준|여름|겨울|"
-    r"플로럴|우디|시트러스|머스크|바닐라|장미|꽃|비누|파우더|"
-    r"fresh|clean|citrus|floral|woody|musk|sweet|perfume",
-    re.IGNORECASE,
-)
-
-
 class ChatRecommendationRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=500)
     top_n: int = Field(default=5, ge=1, le=20)
@@ -40,14 +31,15 @@ class ChatRecommendationRequest(BaseModel):
     def validate_recommendation_message(cls, value: str) -> str:
         message = value.strip()
         compact_message = re.sub(r"\s+", "", message).casefold()
+        content_length = len(re.sub(r"[^\w가-힣]", "", compact_message))
 
-        if compact_message in CASUAL_ONLY_MESSAGES or not PREFERENCE_HINT_PATTERN.search(
-            message
-        ):
+        # Natural-language intent is interpreted by the LLM. Only reject short,
+        # acknowledgement-only messages before spending an API request.
+        if compact_message in CASUAL_ONLY_MESSAGES or content_length < 2:
             raise PydanticCustomError(
                 "invalid_recommendation_message",
-                "유효한 문장을 입력해주세요. "
-                "예시 문장: 중요한 자리에 어울리는 은은하고 깨끗한 향을 추천해줘"
+                "원하는 향이나 상황을 조금 더 자세히 입력해주세요. "
+                "예시: 사회초년생이라 부담 없고 몽글몽글한 향을 찾고 있어요"
             )
 
         return message
