@@ -33,6 +33,38 @@ CATEGORY_RECOMMENDATION_PHRASES = {
 }
 
 
+def _build_preference_confirmation(selected_categories, focus_categories):
+    """Turn extracted categories into a short, user-facing confirmation."""
+    categories = set(selected_categories) | set(focus_categories)
+
+    if "winter" in categories and ("sweet" in categories or "musk" in categories):
+        return "편안하고 포근한 향을 찾으시는군요."
+    if "clean" in categories and "sweet" in categories:
+        return "부담 없이 은은하면서도 달콤한 향을 찾으시는군요."
+    if "date" in categories:
+        return "특별한 약속에 어울리는 향을 찾으시는군요."
+    if "school_work" in categories:
+        return "일상에서 부담 없이 쓸 향을 찾으시는군요."
+    if "summer" in categories:
+        return "가볍고 산뜻한 향을 찾으시는군요."
+    if "winter" in categories:
+        return "따뜻하고 포근한 향을 찾으시는군요."
+    if "musk" in categories:
+        return "부드럽고 편안한 머스크 계열을 찾으시는군요."
+    if "floral" in categories:
+        return "화사한 꽃향이 돋보이는 향을 찾으시는군요."
+    if "woody" in categories:
+        return "차분하고 깊이 있는 우디 향을 찾으시는군요."
+    if "citrus" in categories:
+        return "상큼하고 시원한 시트러스 향을 찾으시는군요."
+    if "sweet" in categories:
+        return "달콤하고 포근한 향을 찾으시는군요."
+    if "clean" in categories:
+        return "깨끗하고 부담 없는 향을 찾으시는군요."
+
+    return "입력하신 취향에 어울리는 향을 찾으시는군요."
+
+
 def _build_assistant_message(selected_categories, focus_categories):
     """Keep the chat card headline short and consistent across analyzers."""
     primary_category = (focus_categories or selected_categories or ["clean"])[0]
@@ -40,7 +72,10 @@ def _build_assistant_message(selected_categories, focus_categories):
         primary_category,
         "입력하신 취향에 어울리는",
     )
-    return f"{phrase} 향수를 추천했어요."
+    confirmation = _build_preference_confirmation(
+        selected_categories, focus_categories
+    )
+    return f"{confirmation} {phrase} 향수를 추천했어요."
 
 
 def _rule_tfidf_analysis(message: str, analysis_source="rule_tfidf") -> dict:
